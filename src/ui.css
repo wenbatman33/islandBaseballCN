@@ -1,3 +1,12 @@
+/* 自带的中文字体：只收录游戏用到的字（scripts/gen_font.py 产生），一个文件涵盖所有粗细。不连外部字体服务，中国大陆也能正常打开 */
+@font-face {
+  font-family: 'Noto Sans SC';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('./fonts/noto-sans-sc-subset.woff2') format('woff2');
+}
+
 :root {
   --ink: #f4efe4;
   --dim: rgba(244, 239, 228, 0.62);

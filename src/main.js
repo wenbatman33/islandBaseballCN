@@ -10,6 +10,8 @@ import '@fontsource/barlow-condensed/600.css';
 import '@fontsource/barlow-condensed/700.css';
 import '@fontsource/barlow-condensed/700-italic.css';
 import '@fontsource/barlow-condensed/600-italic.css';
+import '@fontsource/barlow-condensed/800-italic.css';
+import '@fontsource/barlow-condensed/900-italic.css';
 import './ui.css';
 
 import { LOOK, loadLook } from './look.js';
@@ -111,6 +113,7 @@ async function start() {
       document.fonts.load('italic 700 40px "Barlow Condensed"'),
       document.fonts.load('600 40px "Barlow Condensed"'),
       document.fonts.load('700 40px "Barlow Condensed"'),
+      document.fonts.load('700 40px "Noto Sans SC"', '岛屿职棒'),
     ]);
   } catch (e) {
     /* 字体加载失败就用后备字体 */
