@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>大联盟球员分析</title>
+    <style>
+      :root { --bg: #0f1418; --panel: #161d23; --line: rgba(255, 255, 255, 0.1); --ink: #eef1f4; --dim: #9aa6b2; --acc: #d8ff3e; --good: #58f08a; --warn: #ffb547; --bad: #ff6b5e; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: 'PingFang SC', 'Noto Sans SC', sans-serif; }
+      body { display: flex; flex-direction: column; }
+      header { display: flex; align-items: center; gap: 14px; padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+      header h1 { margin: 0; font-size: 17px; letter-spacing: 0.06em; }
+      header .note { font-size: 12px; color: var(--dim); }
+      .tabs { display: flex; gap: 6px; margin-left: auto; }
+      .tabs button, .chip { cursor: pointer; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); color: var(--ink); border-radius: 7px; padding: 7px 12px; font: 600 13px inherit; }
+      .tabs button.on, .chip.on { background: var(--acc); color: #10161b; border-color: var(--acc); }
+      main { flex: 1; display: flex; min-height: 0; }
+      #stage { position: relative; flex: 1; min-width: 0; }
+      #view { width: 100%; height: 100%; display: block; }
+      .overlay { position: absolute; left: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 24px); }
+      .overlay .chip { background: rgba(12, 18, 22, 0.78); }
+      #timeline { position: absolute; left: 12px; right: 12px; bottom: 12px; background: rgba(12, 18, 22, 0.86); border-radius: 10px; padding: 10px 12px; display: none; }
+      #timeline.show { display: block; }
+      .tl-row { display: flex; align-items: center; gap: 10px; }
+      #scrub { flex: 1; accent-color: var(--acc); }
+      .phases { position: relative; height: 20px; margin: 6px 0 0 0; }
+      .phase { position: absolute; top: 0; height: 20px; border-radius: 4px; font-size: 11px; line-height: 20px; text-align: center; color: #10161b; overflow: hidden; white-space: nowrap; }
+      aside { width: 420px; max-width: 46vw; overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); padding: 14px 16px 40px; }
+      aside h2 { font-size: 15px; margin: 18px 0 8px; letter-spacing: 0.05em; }
+      aside h2:first-child { margin-top: 0; }
+      aside p, aside li { font-size: 13px; line-height: 1.65; color: #d6dde4; }
+      aside ul { padding-left: 18px; margin: 6px 0; }
+      .card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 8px 0; background: rgba(255, 255, 255, 0.03); }
+      .metric { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; margin: 8px 0; }
+      .metric .name { font-size: 13px; }
+      .metric .val { font: 700 15px 'Barlow Condensed', sans-serif; text-align: right; }
+      .metric .bar { grid-column: 1 / -1; position: relative; height: 8px; background: rgba(255, 255, 255, 0.08); border-radius: 4px; }
+      .metric .bar i { position: absolute; top: -2px; width: 3px; height: 12px; border-radius: 2px; }
+      .metric .bar i.us { background: var(--warn); }
+      .metric .bar i.mlb { background: var(--good); }
+      .metric .ref { grid-column: 1 / -1; font-size: 11px; color: var(--dim); }
+      .legend { font-size: 11px; color: var(--dim); display: flex; gap: 12px; }
+      .legend b { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+      .slider { display: grid; grid-template-columns: 7.5em 1fr 3.4em; align-items: center; gap: 8px; font-size: 13px; margin: 6px 0; }
+      .slider input { accent-color: var(--acc); }
+      .slider output { font: 600 13px 'Barlow Condensed', sans-serif; text-align: right; }
+      .row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+      .concept { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+      .tag { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; margin-right: 4px; }
+      .tag.ok { background: rgba(88, 240, 138, 0.18); color: var(--good); }
+      .tag.mid { background: rgba(255, 181, 71, 0.18); color: var(--warn); }
+      .tag.no { background: rgba(255, 107, 94, 0.18); color: var(--bad); }
+      .src { font-size: 11px; color: var(--dim); }
+      .src a { color: #9cc6ff; }
+      .hidden { display: none !important; }
+      @media (max-width: 820px) {
+        main { flex-direction: column; }
+        #stage { height: 58vh; flex: none; }
+        aside { width: auto; max-width: none; border-left: 0; border-top: 1px solid var(--line); }
+        .tabs { margin-left: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>大联盟球员分析</h1>
+      <span class="note">独立分析页，不会改动游戏；拖曳旋转、滚轮缩放</span>
+      <div class="tabs">
+        <button data-tab="body" class="on">球员模型</button>
+        <button data-tab="bat">打击人员</button>
+      </div>
+    </header>
+    <main>
+      <div id="stage">
+        <canvas id="view"></canvas>
+        <div class="overlay" id="cams"></div>
+        <div id="timeline">
+          <div class="tl-row">
+            <button class="chip" id="play">▶ 播放</button>
+            <input type="range" id="scrub" min="0" max="1" step="0.001" value="0" />
+            <span id="tlLabel" style="font-size:12px;min-width:7em;text-align:right"></span>
+          </div>
+          <div class="row" id="speeds"></div>
+          <div class="phases" id="phases"></div>
+        </div>
+      </div>
+      <aside id="panel"></aside>
+    </main>
+    <script type="module" src="/src/mlblab.js"></script>
+  </body>
+</html>

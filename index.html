@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>岛屿职棒</title>
+    <!-- 加到主画面（PWA）：图标、名称、全屏幕 -->
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="theme-color" content="#12235a">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="岛屿职棒">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;1,700;1,800;1,900&family=Noto+Sans+SC:wght@700;900&display=swap" rel="stylesheet">
+</head>
+  <body>
+    <canvas id="scene"></canvas>
+    <div class="hud" id="hud">
+      <div class="scrim-top"></div>
+      <div class="scrim-bottom"></div>
+      <div class="brand"><i></i>ISLAND <span>LEAGUE</span></div>
+      <div class="tag" id="game-tag"></div>
+      <div id="intro"></div>
+      <div id="tags"></div>
+      <div id="live"></div>
+      <div id="dip"></div>
+      <div id="flash"><span>PLAY BALL</span></div>
+      <button id="mute-toggle" type="button" title="静音／开声音（M 键）"><kbd>M</kbd><span>声音开</span></button>
+      <button id="pause-toggle" type="button" title="暂停／继续（Esc 键）"><kbd>Esc</kbd><span>暂停</span></button>
+      <div id="pause-screen" hidden>
+        <div class="ps-box">
+          <h2>暂停中</h2>
+          <p class="ps-score"></p>
+          <div class="ps-btns">
+            <button type="button" id="ps-resume">继续比赛</button>
+            <button type="button" id="ps-reselect">重选球队</button>
+          </div>
+          <small class="ps-tip">按 Esc 也可以继续</small>
+        </div>
+      </div>
+    </div>
+    <div id="dev-export">
+      <p>已拷贝到剪贴板。把这段贴给 Claude 并说「锁定」，数值就会写回原代码。</p>
+      <textarea readonly></textarea>
+      <button type="button">关闭</button>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

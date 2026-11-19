@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-Hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>球员一览</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #aeb4bd; font-family: 'PingFang SC', 'Noto Sans SC', sans-serif; color: #f4efe4; }
+      #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+      .bar { position: fixed; left: 12px; top: 12px; background: rgba(12, 18, 22, 0.86); border-radius: 10px; padding: 10px 12px; max-width: calc(100vw - 24px); }
+      .bar h1 { margin: 0 0 6px; font-size: 15px; }
+      .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+      button { cursor: pointer; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.08); color: inherit; border-radius: 6px; padding: 5px 9px; font: 500 13px inherit; }
+      button.on { background: #d8ff3e; color: #10161b; }
+      #who { position: fixed; left: 12px; bottom: 12px; background: rgba(12, 18, 22, 0.86); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div class="bar">
+      <h1>球员一览（拖曳旋转、滚轮缩放、点球员聚焦）</h1>
+      <div class="row" id="teams"></div>
+      <div class="row" id="poses"></div>
+      <div class="row" id="views"></div>
+    </div>
+    <div id="who"></div>
+    <script type="module" src="/src/lineup.js"></script>
+  </body>
+</html>

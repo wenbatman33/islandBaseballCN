@@ -1,0 +1,1019 @@
+:root {
+  --ink: #f4efe4;
+  --dim: rgba(244, 239, 228, 0.62);
+  --accent: #ffd92e; /* 金色：和标题、对决画面同一套 */
+  --navy: #12235a;
+  --hot: #e8372c;
+  --panel: rgba(12, 18, 22, 0.82);
+  --line: rgba(255, 255, 255, 0.1);
+  --display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --tc: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: #0c1216; overflow: hidden; }
+/* 游戏画面不让浏览器介入：不能选取文本、长按不跳菜单与放大镜（iOS）、不能双指或点两下缩放、不会被拉动回弹 */
+html, body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  touch-action: none; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+/* 例外：DEV 面板与导出框要能卷动、输入、选取拷贝 */
+.lil-gui, .lil-gui *, #dev-export, #dev-export *, input, textarea { -webkit-user-select: text; user-select: text; touch-action: auto; -webkit-touch-callout: default; }
+body { color: var(--ink); font-family: var(--tc); -webkit-font-smoothing: antialiased; }
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 0.8s ease; }
+body.ready #scene { opacity: 1; }
+
+/* 整个 HUD 以 em 为单位，随窗口宽度缩放 */
+.hud { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.8s ease 0.3s;
+  font-size: clamp(10px, 1.12vw, 17px); }
+body.ready .hud { opacity: 1; }
+body.instant #scene, body.instant .hud { transition: none; }
+body.instant .hud *, body.instant #flash, body.instant #dip { animation: none !important; transition: none !important; }
+
+.scrim-top { position: absolute; inset: 0 0 auto 0; height: 8em; background: linear-gradient(rgba(8, 12, 16, 0.6), transparent); }
+.scrim-bottom { position: absolute; inset: auto 0 0 0; height: 17em; background: linear-gradient(transparent, rgba(8, 12, 16, 0.82)); transition: opacity 0.4s; }
+body[data-mode='live'] .scrim-bottom { opacity: 0.55; }
+
+.brand { position: absolute; top: 1.35em; left: 1.75em; display: flex; align-items: center; gap: 0.45em;
+  font: italic 700 1.5em/1 var(--display); letter-spacing: 0.06em; }
+.brand i { width: 0.45em; height: 0.45em; background: var(--accent); transform: rotate(45deg); display: block; }
+.brand span { color: var(--accent); }
+.tag { position: absolute; top: 1.6em; right: 8.8em; font: 600 0.95em/1 var(--display); letter-spacing: 0.16em;
+  padding-bottom: 0.45em; border-bottom: 2px solid var(--accent); }
+.tag b { font-family: var(--tc); font-weight: 600; letter-spacing: 0.08em; margin-right: 0.5em; }
+
+/* 进场动画：依 --i 依序浮现 */
+@keyframes rise { from { opacity: 0; transform: translateY(0.9em); } to { opacity: 1; transform: none; } }
+.seg { display: none; }
+.seg.active { display: block; }
+.seg.active .anim, #tags.show .anim { animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--i) * 55ms + 120ms); }
+
+.emblem { position: relative; display: inline-grid; place-items: center; width: 2.1em; height: 2.1em; border-radius: 50%; flex: none;
+  background: var(--c1); color: var(--c2); border: 0.14em solid var(--c2); font: 700 1em/1 var(--tc); font-style: normal; }
+.emblem.big { font-size: 1.9em; }
+/* 队徽图：盖在队字圆徽上面，图载不到时会自己移除、露出队字 */
+.emblem img { position: absolute; inset: -0.14em; width: calc(100% + 0.28em); height: calc(100% + 0.28em); border-radius: 50%; object-fit: cover; }
+.emblem.sm { font-size: 0.72em; }
+
+.face { position: relative; display: block; flex: none; width: 2.3em; height: 2.3em; border-radius: 0.3em; overflow: hidden;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--c1) 80%, #fff), var(--c1) 55%, color-mix(in srgb, var(--c1) 70%, #000)); }
+.face img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.face i { position: absolute; left: 0.3em; top: 0.15em; font: italic 700 1.25em/1 var(--display); color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.face.sm { width: 2.5em; height: 2.5em; }
+.face.lg { width: 4.6em; height: 4.6em; }
+.face.xl { width: 7.4em; height: 7.4em; border-radius: 0.5em; }
+.face.xl i { font-size: 1.9em; }
+
+.g { display: inline-grid; place-items: center; min-width: 1.35em; height: 1.35em; border-radius: 0.2em; font: 700 0.9em/1 var(--display); color: #10161b; }
+.g-A { background: #ff7a4d; } .g-B { background: #ffc23d; } .g-C { background: var(--accent); } .g-D { background: #7fd4c1; } .g-E { background: #9aa4ad; }
+
+/* ── 1 球场 ── */
+.venue { position: absolute; left: 1.75em; bottom: 5.6em; padding-left: 1em; border-left: 0.25em solid var(--accent); transform-origin: left bottom; }
+.venue .where { font: 600 0.9em/1 var(--display); letter-spacing: 0.22em; color: var(--dim); text-transform: uppercase; }
+.venue h1 { margin: 0.22em 0 0.1em; font: 700 2.5em/1.05 var(--tc); letter-spacing: 0.04em; }
+.venue .en { font: italic 700 1.25em/1 var(--display); letter-spacing: 0.1em; color: var(--accent); }
+.venue dl { display: flex; gap: 1.6em; margin: 1em 0 0; }
+.venue dt { font: 500 0.75em/1 var(--tc); color: var(--dim); letter-spacing: 0.14em; }
+.venue dd { margin: 0.25em 0 0; font: italic 700 1.65em/1 var(--display); }
+.venue dd small { font: 600 0.55em/1 var(--display); color: var(--dim); margin-left: 0.2em; font-style: normal; }
+
+/* ── 2 对战组合 ── */
+.seg-matchup.active { position: absolute; inset: auto 0 5.4em 0; display: flex; justify-content: center; }
+.matchup { transform-origin: center bottom; text-align: center; }
+.mu-head { font: 600 0.95em/1 var(--display); letter-spacing: 0.2em; color: var(--dim); margin-bottom: 0.8em; }
+.mu-head b { font-family: var(--tc); color: var(--accent); margin: 0 0.9em; letter-spacing: 0.1em; }
+.mu-row { display: flex; align-items: stretch; background: var(--panel); border-radius: 0.6em; overflow: hidden;
+  border: 1px solid var(--line); backdrop-filter: blur(10px); }
+.mu-team { display: flex; align-items: center; gap: 1em; padding: 1.1em 1.6em; min-width: 17em; text-align: left; }
+.mu-team.home { flex-direction: row-reverse; text-align: right; }
+.mu-text small { display: block; font: 600 0.8em/1 var(--display); letter-spacing: 0.2em; color: var(--dim); }
+.mu-text b { display: block; font: 700 1.9em/1.2 var(--tc); letter-spacing: 0.04em; margin: 0.15em 0; }
+.mu-text span { font: 500 0.85em/1 var(--tc); color: var(--dim); }
+.mu-text em { font: italic 700 1.15em/1 var(--display); color: var(--ink); margin-left: 0.7em; }
+.mu-team.home .mu-text em { margin: 0 0.7em 0 0; float: left; }
+.mu-vs { display: grid; place-items: center; padding: 0 1.1em; background: var(--accent); color: #10161b;
+  font: italic 700 1.9em/1 var(--display); transform: skewX(-10deg); margin: 0 -0.3em; }
+
+/* ── 共用面板 ── */
+.panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 0.6em;
+  backdrop-filter: blur(10px); padding: 1.1em 1.2em 1em; }
+.p-kicker { font: 600 0.85em/1 var(--display); letter-spacing: 0.22em; color: var(--accent); }
+.p-title { display: flex; align-items: center; gap: 0.6em; margin: 0.55em 0 0.4em; }
+.p-title h2 { margin: 0; font: 700 1.75em/1.1 var(--tc); letter-spacing: 0.04em; }
+.p-title span { margin-left: auto; font: 500 0.9em/1 var(--tc); color: var(--dim); letter-spacing: 0.2em; }
+.p-sub { font: 500 0.82em/1 var(--tc); color: var(--dim); padding-bottom: 0.8em; border-bottom: 1px solid var(--line); }
+.p-sub b { font: italic 700 1.25em/1 var(--display); color: var(--ink); margin-left: 0.3em; }
+.p-sub i { display: inline-block; width: 1px; height: 0.9em; background: var(--line); margin: 0 0.9em; vertical-align: -0.1em; }
+
+/* ── 3 客队打序 ── */
+.lineup { left: 1.75em; top: 4.6em; width: 29em; transform-origin: left top; }
+.rows { list-style: none; margin: 0.3em 0 0; padding: 0; }
+.rows li { display: grid; grid-template-columns: 1.5em 2.4em 2.3em 1fr 3.4em 3em 5em; align-items: center; column-gap: 0.55em;
+  padding: 0.24em 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.rows li.head { font: 500 0.68em/1 var(--tc); color: var(--dim); letter-spacing: 0.1em; padding: 0.7em 0 0.5em; }
+.rows li.head span:nth-child(n + 5) { text-align: right; }
+.rows .ord { font: italic 700 1.3em/1 var(--display); color: var(--accent); font-style: italic; }
+.rows .pos { font: 700 0.9em/1 var(--display); letter-spacing: 0.06em; padding: 0.3em 0; text-align: center; border-radius: 0.2em; background: rgba(255, 255, 255, 0.1); }
+.rows .nm b { display: block; font: 600 1.05em/1.2 var(--tc); letter-spacing: 0.06em; }
+.rows .nm em { font: 500 0.68em/1 var(--tc); color: var(--dim); font-style: normal; }
+.rows .st { font: 600 1.15em/1 var(--display); text-align: right; }
+.rows .ovr { display: flex; align-items: center; gap: 0.4em; justify-content: flex-end; font: italic 700 1.15em/1 var(--display); }
+.rows .ovr u, .bar u { display: block; flex: 1; height: 0.3em; background: rgba(255, 255, 255, 0.12); border-radius: 1em; overflow: hidden; text-decoration: none; }
+.rows .ovr s, .bar s { display: block; height: 100%; background: var(--accent); text-decoration: none; }
+
+/* ── 4 主队防守 ── */
+.defense-head { left: 1.75em; top: 4.6em; width: 24em; transform-origin: left top; }
+.defense-head .p-sub { border-bottom: 0; padding-bottom: 0; }
+#tags { position: absolute; inset: 0; display: none; }
+#tags.show { display: block; }
+.ptag { position: absolute; left: 0; top: 0; will-change: transform; }
+.ptag > div { position: absolute; left: 0; bottom: 0.6em; translate: -50% 0; display: flex; align-items: center; gap: 0.45em; white-space: nowrap;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.35em; padding: 0.28em 0.6em 0.28em 0.3em; }
+.ptag > div::after { content: ''; position: absolute; left: 50%; top: 100%; width: 1px; height: 0.6em; background: var(--accent); }
+.ptag span { font: 700 0.85em/1 var(--display); background: var(--accent); color: #10161b; padding: 0.25em 0.4em; border-radius: 0.2em; }
+.ptag b { font: 600 0.95em/1 var(--tc); letter-spacing: 0.06em; }
+.ptag em { font: italic 600 0.9em/1 var(--display); color: var(--dim); }
+
+/* ── 5 首发投手 ── */
+.pitcher { left: 1.75em; top: 4.6em; width: 25em; transform-origin: left top; }
+.pt-top { display: flex; gap: 1em; align-items: center; margin: 0.8em 0 0.9em; }
+.pt-top h2 { margin: 0; font: 700 2.2em/1.1 var(--tc); letter-spacing: 0.06em; }
+.pt-meta { font: 500 0.85em/1 var(--tc); color: var(--dim); margin: 0.5em 0 0.6em; }
+.pt-ovr { font: 600 0.9em/1 var(--display); letter-spacing: 0.16em; color: var(--dim); }
+.pt-ovr b { font: italic 700 2em/1 var(--display); color: var(--accent); margin-left: 0.25em; letter-spacing: 0; }
+.pt-stats { display: grid; grid-template-columns: repeat(4, 1fr); border-block: 1px solid var(--line); padding: 0.7em 0; }
+.pt-stats dt { font: 500 0.7em/1 var(--tc); color: var(--dim); letter-spacing: 0.1em; }
+.pt-stats dd { margin: 0.3em 0 0; font: italic 700 1.5em/1 var(--display); }
+.pt-bars { padding: 0.8em 0 0.3em; }
+.bar { display: grid; grid-template-columns: 2.6em 1.5em 1fr 1.8em; align-items: center; column-gap: 0.6em; margin-bottom: 0.55em; font: 500 0.85em/1 var(--tc); }
+.bar em { font: italic 700 1.25em/1 var(--display); text-align: right; font-style: italic; }
+.pt-foot { display: flex; align-items: center; gap: 1em; padding-top: 0.7em; border-top: 1px solid var(--line); }
+.pt-speed { font: 500 0.7em/1 var(--tc); color: var(--dim); white-space: nowrap; }
+.pt-speed b { font: italic 700 2.6em/1 var(--display); color: var(--ink); margin: 0 0.12em 0 0.35em; }
+.pt-speed small { font: 600 1em/1 var(--display); }
+.pt-pitches { display: flex; flex-wrap: wrap; gap: 0.35em; justify-content: flex-end; margin-left: auto; }
+.pt-pitches span { display: flex; align-items: center; gap: 0.35em; font: 500 0.78em/1 var(--tc); background: rgba(255, 255, 255, 0.08); padding: 0.3em 0.3em 0.3em 0.55em; border-radius: 0.25em; }
+
+/* ── 开场控制列 ── */
+.intro-bar { position: absolute; left: 1.75em; right: 1.75em; bottom: 1.5em; display: flex; align-items: center; justify-content: space-between;
+  padding-top: 0.9em; border-top: 1px solid rgba(255, 255, 255, 0.18); }
+body[data-mode='live'] .intro-bar { display: none; }
+/* 开场下方只留「略过」：段数、进度条、下一段／开赛倒数都不显示（开场仍会自动往下播、播完自动开赛） */
+.intro-bar { justify-content: flex-end; border-top: 0; }
+.intro-bar .ib-left, .intro-bar .ib-next { display: none; }
+.ib-left { display: flex; align-items: center; gap: 0.9em; }
+.ib-count { font: italic 700 1.25em/1 var(--display); }
+.ib-label { font: 500 0.85em/1 var(--tc); color: var(--dim); letter-spacing: 0.16em; min-width: 5em; }
+.ib-pips { display: flex; gap: 0.35em; }
+.ib-pips i { width: 1.9em; height: 0.18em; background: rgba(255, 255, 255, 0.25); }
+.ib-pips i.done { background: rgba(216, 255, 62, 0.55); }
+.ib-pips i.on { background: var(--accent); }
+.ib-right { display: flex; gap: 0.5em; pointer-events: auto; }
+.intro-bar button { cursor: pointer; border: 0; border-radius: 0.3em; padding: 0.55em 0.95em; font: 600 0.9em/1 var(--tc); letter-spacing: 0.1em; }
+.ib-next { background: var(--accent); color: #10161b; }
+.ib-next b { font: italic 700 1.15em/1 var(--display); margin-left: 0.5em; }
+.ib-skip { background: rgba(255, 255, 255, 0.12); color: var(--ink); }
+.ib-skip:hover { background: rgba(255, 255, 255, 0.22); }
+
+/* ── 比赛画面 ── */
+#live { display: none; }
+body[data-mode='live'] #live { display: block; }
+.scorebug { position: absolute; left: 1.75em; top: 4.4em; display: flex; align-items: stretch; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 0.5em; overflow: hidden; backdrop-filter: blur(10px); transform-origin: left top; }
+.sb-teams { padding: 0.35em 0; }
+.sb-team { display: flex; align-items: center; gap: 0.5em; padding: 0.3em 0.8em 0.3em 0.7em; border-left: 0.2em solid transparent; }
+.sb-team.bat { border-left-color: var(--accent); }
+.sb-team b { font: 600 1em/1 var(--tc); letter-spacing: 0.1em; min-width: 3.2em; }
+.sb-team em { font: italic 700 1.5em/1 var(--display); min-width: 1em; text-align: right; font-style: italic; }
+.sb-inn { display: grid; place-items: center; align-content: center; padding: 0 0.9em; border-inline: 1px solid var(--line); }
+.sb-inn span { font-size: 0.6em; color: var(--accent); }
+.sb-inn b { font: italic 700 1.7em/1 var(--display); }
+.sb-inn small { font: 500 0.6em/1 var(--tc); color: var(--dim); }
+.sb-bases { position: relative; width: 4.2em; }
+.sb-bases i { position: absolute; width: 0.95em; height: 0.95em; transform: rotate(45deg); border: 0.12em solid rgba(255, 255, 255, 0.45); }
+.sb-bases .b2 { left: 1.62em; top: 0.75em; } .sb-bases .b3 { left: 0.75em; top: 1.62em; } .sb-bases .b1 { left: 2.5em; top: 1.62em; }
+.sb-bases i.on { background: var(--accent); border-color: var(--accent); }
+.sb-count { display: grid; align-content: center; gap: 0.28em; padding: 0 0.9em 0 0.3em; }
+.sb-count div { display: flex; align-items: center; gap: 0.28em; }
+.sb-count span { font: 700 0.75em/1 var(--display); color: var(--dim); width: 0.9em; }
+.sb-count i { width: 0.55em; height: 0.55em; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
+.sb-count i.on { background: var(--accent); }
+
+.pitcher-chip { position: absolute; right: 1.75em; top: 4.4em; display: flex; align-items: center; gap: 0.7em; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 0.5em; padding: 0.4em 0.9em 0.4em 0.4em; backdrop-filter: blur(10px); transform-origin: right top; }
+.pitcher-chip small { display: block; font: 500 0.65em/1 var(--tc); color: var(--dim); letter-spacing: 0.1em; }
+.pitcher-chip b { font: 600 1.05em/1.3 var(--tc); letter-spacing: 0.08em; }
+.pc-num { text-align: center; padding-left: 0.7em; border-left: 1px solid var(--line); }
+.pc-num b { display: block; font: italic 700 1.4em/1 var(--display); letter-spacing: 0; }
+
+#live { position: absolute; inset: 0; }
+.batter-card { position: absolute; left: 50%; bottom: 1.6em; margin-left: -19em; width: 38em; display: flex; align-items: center; gap: 1em;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 0.6em; padding: 0.5em 1.2em 0.5em 0.5em; backdrop-filter: blur(10px);
+  transform-origin: center bottom; }
+.bc-name { flex: 1; }
+.bc-name small { display: block; font: 600 0.75em/1 var(--display); letter-spacing: 0.2em; color: var(--accent); }
+.bc-name b { display: block; font: 700 1.7em/1.25 var(--tc); letter-spacing: 0.08em; }
+.bc-name span { font: 500 0.75em/1 var(--tc); color: var(--dim); }
+.bc-stat { text-align: center; padding-left: 1em; border-left: 1px solid var(--line); }
+.bc-stat small { display: block; font: 500 0.65em/1 var(--tc); color: var(--dim); letter-spacing: 0.1em; margin-bottom: 0.4em; }
+.bc-stat b { font: italic 700 1.55em/1 var(--display); }
+.bc-stat.today b { color: var(--accent); }
+
+/* ── 玩法组件 ── */
+.pc-last { font: 600 0.85em/1.2 var(--tc); color: var(--accent); padding-left: 0.7em; border-left: 1px solid var(--line); min-width: 7.5em; text-align: center; }
+
+.pitch-menu { position: absolute; right: 1.75em; bottom: 7em; width: 15em; display: none; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 0.5em; padding: 0.5em; backdrop-filter: blur(10px); pointer-events: auto; transform-origin: right bottom; }
+.pitch-menu.show { display: block; }
+.pm-head { font: 600 0.75em/1 var(--tc); color: var(--dim); letter-spacing: 0.2em; padding: 0.3em 0.4em 0.6em; }
+.pm-head span { display: block; margin-top: 0.55em; font-weight: 500; letter-spacing: 0.04em; white-space: nowrap; opacity: 0.85; }
+.pm-row { display: grid; grid-template-columns: 1.6em 1fr auto 1.5em; align-items: center; column-gap: 0.6em; padding: 0.45em 0.4em; border-radius: 0.3em; cursor: pointer; }
+.pm-row + .pm-row { margin-top: 0.15em; }
+.pm-row kbd { font: 700 0.85em/1 var(--display); text-align: center; padding: 0.25em 0; border-radius: 0.2em; background: rgba(255, 255, 255, 0.12); }
+.pm-row b { font: 600 1em/1 var(--tc); letter-spacing: 0.08em; }
+.pm-row em { font: 500 0.7em/1 var(--tc); color: var(--dim); font-style: normal; }
+.pm-row.on { background: rgba(216, 255, 62, 0.16); }
+.pm-row.on kbd { background: var(--accent); color: #10161b; }
+
+.hint { position: absolute; left: 0; right: 0; bottom: 11.6em; text-align: center; font: 500 0.85em/1 var(--tc); letter-spacing: 0.12em;
+  color: var(--ink); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); opacity: 0; transition: opacity 0.3s; }
+.hint.show { opacity: 0.9; }
+
+.pitch-info { position: absolute; left: 0; right: 0; top: 23%; text-align: center; font: italic 700 1.5em/1 var(--tc); letter-spacing: 0.08em;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7); opacity: 0; }
+.pitch-info.show { animation: info 1.8s both; }
+@keyframes info { 0% { opacity: 0; transform: translateY(0.4em); } 12%, 75% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+
+.call { position: absolute; left: 0; right: 0; top: 30%; text-align: center; font: italic 700 4.2em/1 var(--tc); letter-spacing: 0.08em;
+  color: var(--ink); text-shadow: 0 0.06em 0 rgba(0, 0, 0, 0.5), 0 0 0.6em rgba(0, 0, 0, 0.5); opacity: 0; }
+.call[data-kind='strike'], .call[data-kind='swing'] { color: var(--accent); }
+.call[data-kind='foul'] { color: #ffc23d; }
+.call.show { animation: call 1s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes call { 0% { opacity: 0; transform: scale(1.5) skewX(-8deg); } 18% { opacity: 1; transform: scale(1) skewX(-8deg); } 78% { opacity: 1; transform: scale(1) skewX(-8deg); } 100% { opacity: 0; transform: scale(0.96) skewX(-8deg); } }
+
+.banner { position: absolute; left: 50%; top: 5.2em; width: 26em; margin-left: -13em; text-align: center; display: none; background: var(--panel);
+  border: 1px solid var(--line); border-bottom: 0.25em solid rgba(255, 255, 255, 0.35); border-radius: 0.5em; padding: 0.8em 1em 0.7em;
+  backdrop-filter: blur(10px); transform-origin: center top; }
+.banner.show { display: block; }
+.banner.show > * { animation: rise 0.4s both; }
+.banner.good { border-bottom-color: var(--accent); }
+.banner small { display: block; font: 500 0.8em/1 var(--tc); color: var(--dim); letter-spacing: 0.2em; }
+.banner b { display: block; font: 700 2.2em/1.3 var(--tc); letter-spacing: 0.12em; }
+.banner.good b { color: var(--accent); }
+.banner span { display: block; font: 500 0.85em/1.2 var(--tc); color: var(--dim); letter-spacing: 0.1em; min-height: 1em; }
+
+.final { position: absolute; inset: 0; display: none; place-items: center; background: rgba(8, 12, 16, 0.55); pointer-events: auto; }
+.final.show { display: grid; }
+.fn-box { width: 26em; background: var(--panel); border: 1px solid var(--line); border-radius: 0.7em; padding: 1.4em 1.5em; backdrop-filter: blur(10px); }
+.fn-box h2 { margin: 0.4em 0 0.7em; font: 700 2.3em/1.1 var(--tc); letter-spacing: 0.08em; }
+.fn-row { display: flex; align-items: center; gap: 0.8em; padding: 0.6em 0; border-top: 1px solid var(--line); opacity: 0.7; }
+.fn-row.win { opacity: 1; }
+.fn-row b { font: 600 1.3em/1 var(--tc); letter-spacing: 0.08em; flex: 1; }
+.fn-row span { font: 500 0.8em/1 var(--tc); color: var(--dim); }
+.fn-row em { font: italic 700 2.6em/1 var(--display); min-width: 1.2em; text-align: right; font-style: italic; }
+.fn-row.win em { color: var(--accent); }
+.fn-box button { margin-top: 1em; width: 100%; cursor: pointer; border: 0; border-radius: 0.35em; padding: 0.8em; background: var(--accent);
+  color: #10161b; font: 700 1em/1 var(--tc); letter-spacing: 0.2em; }
+
+/* ── PLAY BALL 与转场 ── */
+#flash { position: absolute; inset: 0; display: none; place-items: center; }
+#flash.show { display: grid; }
+#flash span { font: italic 700 7em/1 var(--display); letter-spacing: 0.04em; color: #10161b; background: var(--accent);
+  padding: 0.08em 0.5em 0.12em; transform: skewX(-8deg); animation: flash 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes flash {
+  0% { opacity: 0; transform: skewX(-8deg) translateX(-40%) scale(1.3); }
+  18% { opacity: 1; transform: skewX(-8deg) translateX(0) scale(1); }
+  75% { opacity: 1; transform: skewX(-8deg) translateX(1.5%) scale(1); }
+  100% { opacity: 0; transform: skewX(-8deg) translateX(40%) scale(0.96); }
+}
+#dip { position: absolute; inset: 0; background: #0c1216; opacity: 0; }
+#dip.go { animation: dip 0.45s ease-out; }
+@keyframes dip { from { opacity: 0.9; } to { opacity: 0; } }
+
+/* ── DEV ── */
+#dev-toggle { position: absolute; right: 1.75em; top: 1.2em; pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 0.5em;
+  padding: 0.45em 0.7em; border-radius: 0.35em; background: var(--panel); color: var(--dim); border: 1px solid var(--line);
+  font: 600 0.85em/1 var(--display); letter-spacing: 0.14em; }
+#dev-toggle:hover { color: var(--ink); border-color: var(--accent); }
+#dev-toggle kbd { font: 700 0.9em/1 var(--display); padding: 0.2em 0.4em; border-radius: 0.2em; background: var(--accent); color: #10161b; }
+#mute-toggle { position: absolute; right: 1.75em; top: 1.2em; pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 0.5em;
+  padding: 0.45em 0.7em; border-radius: 0.35em; background: var(--panel); color: var(--dim); border: 1px solid var(--line);
+  font: 600 0.85em/1 var(--tc); letter-spacing: 0.08em; }
+#mute-toggle:hover { color: var(--ink); border-color: var(--accent); }
+#mute-toggle kbd { font: 700 0.9em/1 var(--display); padding: 0.2em 0.4em; border-radius: 0.2em; background: var(--accent); color: #10161b; }
+#mute-toggle.off { color: #ff8a70; border-color: rgba(255, 138, 112, 0.5); }
+#mute-toggle.off kbd { background: #ff8a70; }
+body.dev-drag [data-lay] { pointer-events: auto; cursor: move; outline: 1px dashed var(--accent); outline-offset: 3px; user-select: none; }
+body.dev-drag [data-lay].sel { outline: 2px solid var(--accent); }
+body.dev-drag [data-lay] button { pointer-events: none; }
+body.free-cam .scrim-bottom, body.free-cam #intro .seg, body.free-cam #tags, body.free-cam #live { opacity: 0.35; }
+body.instant .call.show, body.instant .pitch-info.show { opacity: 1; }
+
+#dev-export { position: fixed; inset: 0; margin: auto; width: min(560px, 90vw); height: fit-content;
+  background: #141b21; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 10px; padding: 16px;
+  display: none; z-index: 1000; }
+#dev-export.show { display: block; }
+#dev-export p { margin: 0 0 10px; font-size: 14px; }
+#dev-export textarea { width: 100%; height: 320px; background: #0c1216; color: var(--ink); border: 0; border-radius: 6px;
+  padding: 10px; font: 12px/1.5 ui-monospace, Menlo, monospace; resize: vertical; }
+#dev-export button { margin-top: 10px; padding: 8px 16px; border: 0; border-radius: 5px; background: var(--accent);
+  color: #10161b; font: 700 14px var(--tc); cursor: pointer; }
+
+/* ── 手机直式 ── */
+@media (max-width: 700px) {
+  .hud { font-size: clamp(10px, 3.1vw, 14px); }
+  .tag { display: none; }
+  .venue { left: 1.2em; bottom: 6em; }
+  .venue h1 { font-size: 2em; }
+  .venue dl { gap: 1.1em; }
+  .seg-matchup.active { inset: auto 0.8em 6em 0.8em; }
+  .mu-row { flex-direction: column; }
+  .mu-team { min-width: 0; padding: 0.8em 1.1em; }
+  .mu-vs { transform: none; margin: 0; padding: 0.25em; font-size: 1.3em; }
+  .lineup, .pitcher { left: 0.8em; right: 0.8em; top: auto; bottom: 5.4em; width: auto; transform-origin: center bottom; }
+  .rows li { grid-template-columns: 1.3em 2.2em 2em 1fr 3.2em 4.2em; padding: 0.12em 0; }
+  .rows li > :nth-child(6) { display: none; }
+  .defense-head { left: 0.8em; right: 0.8em; width: auto; }
+  .ptag b { display: none; }
+  .intro-bar { left: 0.8em; right: 0.8em; }
+  .ib-pips i { width: 1.1em; }
+  .ib-label { display: none; }
+  .scorebug { left: 0.8em; }
+  .pitcher-chip { right: 0.8em; top: 9.4em; }
+  .batter-card { left: 0.8em; right: 0.8em; width: auto; margin-left: 0; gap: 0.6em; }
+  .bc-stat { padding-left: 0.6em; }
+  .bc-stat.today { display: none; }
+  #flash span { font-size: 4em; }
+  .pitch-menu { right: 0.8em; bottom: 8.4em; width: 12.5em; }
+  .hint { bottom: 9.6em; font-size: 0.75em; padding: 0 1em; line-height: 1.5; }
+  .banner { width: auto; left: 0.8em; right: 0.8em; margin-left: 0; top: 13.5em; }
+  .call { font-size: 3em; }
+  .pc-last { display: none; }
+  .fn-box { width: auto; margin: 0 0.8em; }
+}
+
+/* 打开声音的小提示：不挡画面、不拦截点击 */
+#sound-hint { position: fixed; left: 50%; bottom: 1.6em; transform: translateX(-50%); z-index: 40; pointer-events: none;
+  padding: 0.5em 1.1em; border-radius: 2em; background: rgba(12, 18, 22, 0.72); color: var(--ink);
+  font: 500 0.8em/1 var(--tc); letter-spacing: 0.12em; border: 1px solid rgba(255, 255, 255, 0.16); }
+
+/* 加载中（模型和语音音档还没好之前画面是黑的，放个字样免得像当掉） */
+body:not(.ready)::after { content: '加载中…'; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: rgba(244, 239, 228, 0.7); font: 500 1em/1 'PingFang SC', 'Noto Sans SC', sans-serif; letter-spacing: 0.3em; }
+
+/* ── 击球的操作说明、「挥！」提示、挥棒回馈 ── */
+.bat-help { position: absolute; left: 1.6em; bottom: 8.2em; max-width: 24em; padding: 0.8em 1em; border-radius: 0.6em;
+  background: rgba(12, 18, 22, 0.82); border: 1px solid rgba(255, 255, 255, 0.14); color: var(--ink);
+  opacity: 0; transform: translateY(0.4em); transition: opacity 0.25s, transform 0.25s; pointer-events: none; }
+.bat-help.show { opacity: 1; transform: none; }
+.bat-help .bh-title { font: 700 0.95em/1 var(--tc); letter-spacing: 0.2em; color: var(--accent); margin-bottom: 0.7em; }
+.bat-help .bh-step { display: flex; gap: 0.7em; align-items: flex-start; font: 500 0.86em/1.5 var(--tc); margin-top: 0.4em; }
+.bat-help .bh-step i { flex: none; width: 1.5em; height: 1.5em; border-radius: 50%; background: var(--accent); color: #10161b;
+  font: 700 0.9em/1.5em var(--display); text-align: center; font-style: normal; }
+.bat-help b { font-weight: 700; }
+.bat-help em { font-style: normal; font-weight: 700; }
+.bat-help em.y { color: #d8ff3e; }
+.bat-help em.o { color: #ff9a73; }
+.bat-help em.g { color: #58f08a; }
+.bat-help kbd { padding: 0.1em 0.5em; border-radius: 0.3em; background: rgba(255, 255, 255, 0.16); font: 600 0.9em/1 var(--tc); }
+
+.swing-now { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(0.8); padding: 0.15em 0.6em; border-radius: 0.3em;
+  background: #58f08a; color: #0b1a10; font: 800 2.4em/1.2 var(--tc); letter-spacing: 0.1em; opacity: 0; pointer-events: none; }
+.swing-now.show { opacity: 1; transform: translate(-50%, -50%) scale(1); transition: transform 0.06s; }
+
+.swing-fb { position: absolute; left: 50%; top: 40%; transform: translateX(-50%); padding: 0.35em 0.9em; border-radius: 0.4em;
+  background: rgba(12, 18, 22, 0.85); color: var(--ink); font: 700 1.15em/1.3 var(--tc); letter-spacing: 0.1em; opacity: 0; pointer-events: none;
+  border-left: 0.25em solid #ffb347; white-space: nowrap; }
+.swing-fb[data-tone='good'] { border-left-color: #58f08a; color: #c9ffd9; }
+.swing-fb.show { animation: swingFb 1.9s ease-out both; }
+@keyframes swingFb { 0% { opacity: 0; transform: translate(-50%, 0.5em); } 10% { opacity: 1; transform: translate(-50%, 0); } 80% { opacity: 1; } 100% { opacity: 0; } }
+@media (max-width: 760px) { .bat-help { left: 0.6em; right: 0.6em; max-width: none; bottom: 9.6em; font-size: 0.85em; } }
+body.instant .swing-fb.show { opacity: 1; }
+
+/* ── 防守传垒：跟着镜头的浮动垒包（手机点、电脑按 1–4） ── */
+#base-picker { position: fixed; inset: 0; z-index: 30; pointer-events: none; opacity: 0; transition: opacity 0.12s; }
+#base-picker.show { opacity: 1; }
+#base-picker.show .bp-base { pointer-events: auto; }
+.bp-base { position: fixed; left: 0; top: 0; width: 4.4em; height: 4.4em; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.9);
+  background: rgba(14, 22, 30, 0.78); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.1em; font: 700 1em/1 'PingFang SC', 'Noto Sans SC', sans-serif; cursor: pointer; touch-action: manipulation;
+  box-shadow: 0 0.3em 1em rgba(0, 0, 0, 0.45); -webkit-tap-highlight-color: transparent; }
+.bp-base i { font-style: normal; font-size: 1.5em; line-height: 1; }
+.bp-base span { font-size: 0.72em; letter-spacing: 0.08em; opacity: 0.9; }
+.bp-base.good { background: rgba(32, 150, 82, 0.9); border-color: #b9ffcf; box-shadow: 0 0 0 0.3em rgba(88, 240, 138, 0.35), 0 0.3em 1em rgba(0, 0, 0, 0.45); }
+.bp-base.edge { opacity: 0.75; border-style: dashed; }
+.bp-base:active { filter: brightness(1.25); }
+.bp-bar { position: fixed; left: 50%; top: 4.6em; transform: translateX(-50%); padding: 0.55em 1.1em 0.7em; border-radius: 0.6em;
+  background: rgba(12, 18, 22, 0.85); border: 1px solid rgba(255, 255, 255, 0.16); color: #fff; text-align: center;
+  font: 600 1em/1.3 'PingFang SC', 'Noto Sans SC', sans-serif; min-width: 13em; }
+.bp-bar b { display: block; font-size: 1.15em; letter-spacing: 0.1em; }
+.bp-keys { display: block; font-size: 0.75em; opacity: 0.75; margin-top: 0.15em; }
+.bp-bar em { display: block; height: 0.3em; margin-top: 0.45em; border-radius: 0.2em; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.bp-bar u { display: block; height: 100%; background: #58f08a; transform-origin: left; }
+@media (max-width: 700px) { .bp-base { width: 4.8em; height: 4.8em; } .bp-bar { top: 15.4em; font-size: 0.9em; } }
+
+/* ── 触摸操作（手机）：左下摇杆、右下主按钮、下方球种横排 ── */
+.tc-stick, .tc-main { position: absolute; display: none; pointer-events: auto; touch-action: none; user-select: none; -webkit-user-select: none; }
+.tc-stick.show { display: grid; }
+.tc-main.show { display: grid; }
+.tc-stick { left: max(1.6em, env(safe-area-inset-left)); bottom: 1.6em; width: 9.5em; aspect-ratio: 1; border-radius: 50%; place-items: center;
+  background: rgba(12, 18, 22, 0.5); border: 2px solid rgba(255, 255, 255, 0.28); transform-origin: left bottom; }
+.tc-stick i { width: 52%; aspect-ratio: 1; border-radius: 50%; background: #f3f1ea; box-shadow: 0 0.15em 0.6em rgba(0, 0, 0, 0.45); pointer-events: none; }
+.tc-main { right: max(1.6em, env(safe-area-inset-right)); bottom: 1.6em; width: 9.5em; aspect-ratio: 1; border-radius: 50%; place-items: center; border: 0;
+  background: #ff8a2a; color: #1a1206; font: 700 1.7em/1 var(--tc); letter-spacing: 0.1em; width: 5.6em; box-shadow: 0 0.2em 0.8em rgba(0, 0, 0, 0.4);
+  transform-origin: right bottom; -webkit-tap-highlight-color: transparent; }
+.tc-main:active { filter: brightness(0.86); scale: 0.96; }
+.pm-row small { display: none; }
+
+/* 触摸时球种改成下方横排：每格是球种、拿手程度、球速 */
+body.touch .pitch-menu { left: 0; right: 0; margin: 0 auto; bottom: 1.2em; width: fit-content; padding: 0.3em; transform-origin: center bottom;
+  background: none; border: 0; backdrop-filter: none; }
+body.touch .pitch-menu.show { display: flex; gap: 0.35em; }
+body.touch .pm-head { display: none; }
+body.touch .pm-row { display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'n g' 's s'; row-gap: 0.35em; column-gap: 0.5em; min-width: 5.6em;
+  padding: 0.6em 0.7em; margin: 0; border-radius: 0.5em; background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(10px); }
+body.touch .pm-row + .pm-row { margin-top: 0; }
+body.touch .pm-row kbd, body.touch .pm-row em { display: none; }
+body.touch .pm-row b { grid-area: n; white-space: nowrap; }
+body.touch .pm-row i { grid-area: g; }
+body.touch .pm-row small { grid-area: s; display: block; font: 500 0.75em/1 var(--tc); color: var(--dim); }
+body.touch .pm-row.on { background: #f3f1ea; color: #10161b; border-color: #f3f1ea; }
+body.touch .pm-row.on small { color: #55606b; }
+/* 触摸时提示文本往上移，不压到球种列；击球说明缩小放下方中央（击球时那里没有球种列） */
+body.touch .hint { bottom: 6.6em; }
+body.touch .bat-help { left: 50%; right: auto; translate: -50% 0; bottom: 1em; top: auto; width: 27em; max-width: none; font-size: 0.78em; padding: 0.6em 0.9em; }
+/* 触摸时下方留给操作：击球员信息卡移到画面上方中央并缩小 */
+body.touch .batter-card { bottom: auto; top: 0.8em; transform-origin: center top; font-size: 0.72em; }
+
+/* ── 触摸直式（手机直拿）：球种在最下方置中、放不下就换行；摇杆与主按钮往上移到球种列上方；提示文本再往上 ── */
+@media (max-width: 700px) {
+  body.touch .pitch-menu { left: 0.6em; right: 0.6em; margin: 0; width: auto; bottom: 0.8em; padding: 0; justify-content: center; flex-wrap: wrap; transform-origin: center bottom; }
+  body.touch .pm-row { flex: 1 1 0; min-width: 0; padding: 0.55em 0.5em; }
+  body.touch .pm-row b { font-size: 0.92em; letter-spacing: 0.02em; }
+  body.touch .tc-stick { left: 0.8em; bottom: 5.4em; width: 8.4em; }
+  body.touch .tc-main { right: 0.8em; bottom: 5.4em; width: 5em; }
+  body.touch .hint { bottom: 18.6em; right: 13.5em; text-align: left; padding: 0 0 0 1em; }
+  body.touch .bat-help { left: 0.6em; right: 0.6em; width: auto; translate: none; bottom: 0.8em; }
+  /* 击球员信息卡：直式时放回比分板下方、靠左，不压到右上角的声音钮 */
+  body.touch .batter-card { top: 13.6em; left: 0.8em; right: auto; width: auto; max-width: 62%; font-size: 0.8em; }
+  body.touch .batter-card .bc-stat { display: none; }
+}
+/* 触摸时「点一下打开声音」的提示移到上方，不盖住下方的操作 */
+body.touch #sound-hint { bottom: auto; top: 38%; }
+#sound-hint { white-space: nowrap; }
+/* 手机比赛中一定会点画面操作，提示不用再盖在球场中间（会压到牛棚、传球菜单） */
+body.touch[data-mode='live'] #sound-hint { display: none; }
+/* 下方有对战卡、击球员卡，声音提示一律放到最上面那一排的中间 */
+body:not(.touch) #sound-hint { bottom: auto; top: 0.9em; }
+
+/* ── 比赛中的接口：和标题、对决画面同一套（Codex 画的金框面板、按钮、摇杆与判决美术字，public/ui/）──
+   只改外观，位置与大小沿用上面的规则（DEV 拖曳版面照旧） */
+/* 面板：九宫格拉伸的金框深蓝底板，任何尺寸四个角都不变形 */
+.scorebug, .pitcher-chip, .batter-card, .pitch-menu, .banner, .fn-box, .bat-help {
+  background: none; border: 0.8em solid transparent; border-image: url('/ui/panel.webp') 52 fill / 0.95em stretch; border-radius: 0; backdrop-filter: none; overflow: visible;
+  filter: drop-shadow(0 0.35em 0.45em rgba(0, 0, 0, 0.55)); }
+.scorebug { padding: 0.1em 0.2em; }
+.pitcher-chip { padding: 0.1em 0.5em 0.1em 0.1em; }
+.batter-card { padding: 0.1em 0.7em 0.1em 0.1em; }
+.pitch-menu { padding: 0.1em; }
+.banner { padding: 0.3em 0.8em 0.2em; }
+.fn-box { padding: 0.8em 1.1em; }
+.bat-help { padding: 0.2em 0.5em; }
+/* 头像：金框 */
+#live .face { border: 0.14em solid var(--accent); box-shadow: 0 0 0 0.1em #050a20, inset 0 0 0.6em rgba(0, 0, 0, 0.35); border-radius: 0.45em; }
+/* 记分板 */
+.sb-team { border-left: 0; border-radius: 0.4em; padding: 0.28em 0.7em 0.28em 0.5em; }
+.sb-team.bat { background: linear-gradient(90deg, rgba(255, 217, 46, 0.42), rgba(255, 217, 46, 0.06)); box-shadow: inset 0.22em 0 0 var(--accent); }
+.sb-team b { font-weight: 900; }
+.sb-team.bat b { color: var(--accent); }
+.sb-team em { font: italic 900 1.75em/1 var(--display); color: #fff; text-shadow: 0 0.08em 0 #050a20; }
+.sb-inn { border-inline: 2px solid rgba(255, 217, 46, 0.35); }
+.sb-inn span { color: var(--hot); font-size: 0.7em; }
+.sb-inn b { font: italic 900 1.9em/1 var(--display); color: var(--accent); text-shadow: 0 0.08em 0 #050a20; }
+.sb-bases i { border: 0.13em solid #8fa3e8; background: #0a1238; border-radius: 0.12em; }
+.sb-bases i.on { background: linear-gradient(135deg, #fff6b0, var(--accent) 55%, #ff9a1e); border-color: #fff; box-shadow: 0 0 0.6em var(--accent); }
+.sb-count span { font: italic 900 0.85em/1 var(--display); color: #c9d6ff; }
+.sb-count i { width: 0.66em; height: 0.66em; background: #0a1238; box-shadow: inset 0 0 0 0.09em #5d72bd; }
+.sb-count div:nth-child(1) i.on { background: #49c4ff; box-shadow: 0 0 0.5em #49c4ff, inset 0 0.1em 0 rgba(255, 255, 255, 0.7); }
+.sb-count div:nth-child(2) i.on { background: var(--accent); box-shadow: 0 0 0.5em var(--accent), inset 0 0.1em 0 rgba(255, 255, 255, 0.7); }
+.sb-count div:nth-child(3) i.on { background: var(--hot); box-shadow: 0 0 0.5em var(--hot), inset 0 0.1em 0 rgba(255, 255, 255, 0.6); }
+/* 投手信息 */
+.pitcher-chip small { color: #c9d6ff; font-weight: 700; }
+.pitcher-chip b { font-weight: 900; }
+.pc-num, .pc-last, .bc-stat { border-left: 2px solid rgba(255, 217, 46, 0.35); }
+.pc-num b { font: italic 900 1.6em/1 var(--display); color: var(--accent); text-shadow: 0 0.08em 0 #050a20; }
+.pc-last { color: #fff; font-weight: 900; }
+/* 击球员卡 */
+.bc-name small { display: inline-block; margin-bottom: 0.25em; padding: 0.28em 0.8em 0.22em; font: italic 800 0.78em/1 var(--display); letter-spacing: 0.16em; color: #fff;
+  background: linear-gradient(#ff6a3a, var(--hot)); border-radius: 0.3em; transform: skewX(-12deg); box-shadow: 0 0.12em 0 #050a20; }
+.bc-name b { font-weight: 900; font-size: 1.8em; text-shadow: 0 0.08em 0 #050a20; }
+.bc-name span { color: #c9d6ff; font-weight: 700; }
+.bc-stat small { color: #c9d6ff; font-weight: 700; }
+.bc-stat b { font: italic 900 1.7em/1 var(--display); text-shadow: 0 0.08em 0 #050a20; }
+.bc-stat.today b { color: var(--accent); }
+/* 球种菜单：每一列是一颗小按钮，选中的换成金色面板 */
+.pm-head { color: var(--accent); font-weight: 900; }
+.pm-head span { color: #c9d6ff; }
+.pm-row, body.touch .pm-row { background: linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02) 48%), #1a2c74; border: 0.14em solid #050a20; box-shadow: inset 0 0 0 0.08em #6f86d6; border-radius: 0.55em; }
+.pm-row + .pm-row { margin-top: 0.3em; }
+.pm-row b { font-weight: 900; }
+.pm-row em { color: #c9d6ff; }
+.pm-row kbd { background: #050a20; color: var(--accent); font-weight: 900; }
+.pm-row.on, body.touch .pm-row.on { color: var(--navy); background: none; border: 0.5em solid transparent; border-image: url('/ui/panel_gold.webp') 52 fill / 0.62em stretch; box-shadow: none; padding: 0.1em 0.05em;
+  filter: drop-shadow(0 0 0.5em rgba(255, 217, 46, 0.85)); }
+.pm-row.on em, body.touch .pm-row.on small { color: #5a4300; }
+.pm-row.on kbd { background: var(--navy); color: #fff; }
+/* 结果横幅 */
+.banner small { color: #c9d6ff; font-weight: 700; }
+.banner b { font-weight: 900; text-shadow: 0 0.07em 0 #050a20; }
+.banner.good b { color: var(--accent); }
+.banner.hr b { font-size: 3em; background: linear-gradient(#fff6b0, var(--accent) 45%, #ff7a1e); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 0.06em 0 #050a20); }
+.banner span { color: #fff; font-weight: 700; }
+/* 判决：画好的立体美术字 */
+.call { font-weight: 900; -webkit-text-stroke: 0.14em #050a20; paint-order: stroke fill; }
+.call img { display: block; margin: 0 auto; height: 2.5em; width: auto; max-width: 92vw; object-fit: contain; filter: drop-shadow(0 0.1em 0.12em rgba(0, 0, 0, 0.55)); }
+.call small { display: block; margin-bottom: -0.2em; font-size: 0.42em; letter-spacing: 0.2em; color: #fff; -webkit-text-stroke: 0.22em #050a20; }
+@keyframes call { 0% { opacity: 0; transform: scale(2.2) rotate(-6deg); } 16% { opacity: 1; transform: scale(0.94) rotate(1deg); } 24% { transform: scale(1.03); } 80% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.08); } }
+/* 提示文本 */
+.hint { font-weight: 700; color: #fff; text-shadow: 0 0 0.3em #050a20, 0 0.08em 0 #050a20, 0 0 0.9em rgba(5, 10, 32, 0.9); }
+.pitch-info { font-weight: 900; color: var(--accent); -webkit-text-stroke: 0.22em #050a20; paint-order: stroke fill; text-shadow: none; }
+/* 赛后结算 */
+.fn-box h2 { font-weight: 900; color: var(--accent); text-shadow: 0 0.07em 0 #050a20; }
+.fn-row { border-top: 2px solid rgba(255, 217, 46, 0.3); }
+.fn-row b { font-weight: 900; }
+.fn-row em { font: italic 900 2.8em/1 var(--display); }
+.fn-box button { border: 0.16em solid #050a20; border-radius: 0.7em; color: #fff; font-weight: 900; background: linear-gradient(rgba(255, 255, 255, 0.45), transparent 48%), linear-gradient(#ff6a3a, var(--hot) 60%, #b81d1d);
+  box-shadow: 0 0 0 0.12em var(--accent), 0 0.3em 0 #050a20; text-shadow: 0 0.08em 0 #050a20; }
+/* 手机的摇杆（底座加一颗棒球当摇杆头）与主按钮 */
+.tc-stick { background: url('/ui/stick_base.webp') center / 100% 100% no-repeat; border: 0; border-radius: 0; filter: drop-shadow(0 0.3em 0.4em rgba(0, 0, 0, 0.5)); }
+.tc-stick i { width: 50%; background: url('/ui/stick_knob.webp') center / contain no-repeat; box-shadow: none; border-radius: 0; filter: drop-shadow(0 0.2em 0.25em rgba(0, 0, 0, 0.55)); }
+.tc-main { background: url('/ui/btn_main.webp') center / 100% 100% no-repeat; box-shadow: none; border-radius: 0; color: #fff; font-weight: 900; letter-spacing: 0.06em;
+  -webkit-text-stroke: 0.2em var(--navy); paint-order: stroke fill; filter: drop-shadow(0 0.25em 0.35em rgba(0, 0, 0, 0.55)); }
+.tc-main:active { filter: brightness(0.88) drop-shadow(0 0.1em 0.15em rgba(0, 0, 0, 0.55)); scale: 0.94; }
+/* 静音与开发按钮 */
+#mute-toggle, #dev-toggle { background: linear-gradient(rgba(255, 255, 255, 0.18), transparent 50%), #1a2c74; border: 2px solid #050a20; box-shadow: 0 0 0 2px #6f86d6; color: #fff; border-radius: 99px; font-weight: 700; }
+#flash span { color: #fff; background: linear-gradient(#ff6a3a, var(--hot)); font-weight: 900; -webkit-text-stroke: 0.06em #050a20; paint-order: stroke fill; box-shadow: 0 0 0 0.05em var(--accent), 0 0.08em 0 0.05em #050a20; }
+
+/* ── 赛后画面：整张赛后插画铺满，上面是结果的美术字、逐局比分与两颗按钮；赢球飘彩带，输球下雨 ── */
+.final { position: fixed; z-index: 55; background: #050a20; }
+.result { position: absolute; inset: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2vh; padding: 0 3vw 4vh; font-family: 'Noto Sans SC', var(--tc); color: #fff; }
+.rs-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; animation: rs-push 14s ease-out both; }
+@keyframes rs-push { from { transform: scale(1.14); } to { transform: scale(1.02); } }
+.result::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(rgba(5, 10, 32, 0.25), transparent 30%, transparent 45%, rgba(5, 10, 32, 0.82) 88%); }
+.result.lose .rs-art { filter: saturate(0.72) brightness(0.86); }
+.rs-fx { position: absolute; inset: -20% 0 0 0; z-index: 1; pointer-events: none; }
+/* 赢球：彩带纸花 */
+.result.win .rs-fx { background:
+    radial-gradient(circle, #ffd92e 0 4px, transparent 5px) 0 0 / 170px 210px,
+    radial-gradient(circle, #e8372c 0 3.5px, transparent 4.5px) 60px 80px / 230px 190px,
+    radial-gradient(circle, #fff 0 3px, transparent 4px) 110px 30px / 140px 250px,
+    radial-gradient(circle, #49c4ff 0 3.5px, transparent 4.5px) 20px 140px / 260px 220px,
+    linear-gradient(115deg, transparent 49.2%, #ffd92e 49.2% 50.8%, transparent 50.8%) 40px 0 / 190px 160px,
+    linear-gradient(60deg, transparent 49.2%, #ff7a55 49.2% 50.8%, transparent 50.8%) 120px 60px / 240px 200px;
+  animation: rs-confetti 6s linear infinite; }
+@keyframes rs-confetti { to { background-position: 30px 420px, 110px 460px, 80px 530px, -30px 580px, 90px 320px, 60px 460px; } }
+/* 输球：斜斜的雨丝 */
+.result.lose .rs-fx { opacity: 0.55; background: repeating-linear-gradient(105deg, transparent 0 22px, rgba(190, 215, 255, 0.5) 22px 23px, transparent 23px 61px); background-size: 320px 320px; animation: rs-rain 0.5s linear infinite; }
+@keyframes rs-rain { to { background-position: -86px 320px; } }
+.rs-word { position: relative; z-index: 2; width: min(46vw, 62vh, 620px); height: auto; margin-bottom: auto; margin-top: 3vh; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.6));
+  animation: tt-slam 0.7s cubic-bezier(0.2, 1.5, 0.4, 1) both, tt-float 3.2s 0.7s ease-in-out infinite alternate; }
+h2.rs-word { width: auto; font-weight: 900; font-size: clamp(3rem, 16vh, 8rem); line-height: 1; color: var(--accent); -webkit-text-stroke: 0.14em #050a20; paint-order: stroke fill; }
+/* 输球的字放小一点、靠右上，不要盖住画面里那个人 */
+.result.lose .rs-word { width: min(32vw, 44vh, 440px); align-self: flex-end; margin-right: 3vw; animation: rs-sink 1s ease-out both; }
+body:has(.final.show) #sound-hint { display: none; }
+@keyframes rs-sink { from { opacity: 0; transform: translateY(-6vh); } }
+.rs-board { position: relative; z-index: 2; width: min(44em, 94vw); padding: 0.5em 1em 0.6em; border: 0.9em solid transparent; border-image: url('/ui/panel.webp') 52 fill / 1em stretch;
+  filter: drop-shadow(0 0.6em 0.8em rgba(0, 0, 0, 0.6)); animation: bp-in 0.4s 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.rs-kicker { font: italic 800 0.9em/1 'Barlow Condensed', var(--display); letter-spacing: 0.2em; color: var(--accent); margin-bottom: 0.5em; }
+.rs-board table { width: 100%; border-collapse: collapse; }
+.rs-board td, .rs-board th { padding: 0.32em 0.4em; text-align: center; font: italic 800 1.25em/1 'Barlow Condensed', var(--display); }
+.rs-board thead td { font-size: 0.9em; color: #c9d6ff; border-bottom: 2px solid rgba(255, 217, 46, 0.35); }
+.rs-board tbody th { display: flex; align-items: center; gap: 0.5em; text-align: left; font: 900 1.05em/1 'Noto Sans SC', var(--tc); letter-spacing: 0.05em; white-space: nowrap; }
+.rs-board tbody th .emblem { font-size: 0.85em; border-color: #fff; }
+.rs-board tbody th i { padding: 0.2em 0.5em; font: 900 0.6em/1.1 var(--tc); font-style: normal; color: var(--navy); background: var(--accent); border-radius: 99px; }
+.rs-board tbody tr { opacity: 0.72; }
+.rs-board tbody tr.win { opacity: 1; background: linear-gradient(90deg, rgba(255, 217, 46, 0.3), rgba(255, 217, 46, 0.05)); }
+.rs-board td.r { font-size: 1.9em; color: #fff; padding-inline: 0.5em; }
+.rs-board tr.win td.r { color: var(--accent); text-shadow: 0 0.07em 0 #050a20; }
+.rs-board p { margin: 0.6em 0 0; text-align: center; font-weight: 900; font-size: 1.05em; letter-spacing: 0.06em; }
+.rs-btns { position: relative; z-index: 2; display: flex; gap: 1.2em; animation: bp-in 0.4s 0.8s both; }
+.rs-btns button { padding: 0.7em 2em 0.62em; cursor: pointer; font: 900 1.1em/1 'Noto Sans SC', var(--tc); letter-spacing: 0.2em; text-indent: 0.2em; color: #fff; border: 0.16em solid #050a20; border-radius: 99px;
+  background: linear-gradient(rgba(255, 255, 255, 0.45), transparent 48%), linear-gradient(#ff6a3a, var(--hot) 60%, #b81d1d); box-shadow: 0 0 0 0.12em var(--accent), 0 0.3em 0 #050a20; text-shadow: 0 0.08em 0 #050a20; }
+.rs-btns #reselect { background: linear-gradient(rgba(255, 255, 255, 0.28), transparent 50%), linear-gradient(#2b47a6, #14246a); }
+.rs-btns button:hover { filter: brightness(1.12); translate: 0 -2px; }
+@media (max-width: 700px) {
+  .result { padding: 0 3vw 3vh; gap: 1.6vh; font-size: clamp(11px, 3.3vw, 14px); }
+  .rs-word { width: 66vw; margin-top: 2vh; }
+  .result.lose .rs-word { width: 50vw; }
+  .rs-board td, .rs-board th { padding: 0.3em 0.2em; }
+  .rs-btns { width: 100%; }
+  .rs-btns button { flex: 1; padding: 0.8em 0.4em; }
+}
+
+/* ── 投手体力、混乱、换投手 ── */
+/* 体力条：名字下面一条；一半以下变橘、四分之一以下变红并闪烁 */
+.pc-en { display: flex; align-items: center; gap: 0.4em; margin-top: 0.25em; }
+.pc-en u, .bp-en u { display: block; width: 5.4em; height: 0.5em; border-radius: 1em; background: #050a20; box-shadow: inset 0 0 0 0.07em #5d72bd; overflow: hidden; text-decoration: none; }
+.pc-en s, .bp-en s { display: block; height: 100%; border-radius: 1em; text-decoration: none; transition: width 0.4s;
+  background: linear-gradient(rgba(255, 255, 255, 0.6), transparent 55%), linear-gradient(90deg, #38d8ff, #7dffb0); }
+.pc-en.mid s, .bp-en.mid s { background: linear-gradient(rgba(255, 255, 255, 0.6), transparent 55%), linear-gradient(90deg, #ff9a1e, var(--accent)); }
+.pc-en.low s, .bp-en.low s { background: linear-gradient(rgba(255, 255, 255, 0.5), transparent 55%), linear-gradient(90deg, #b81d1d, var(--hot)); animation: en-low 0.6s steps(2) infinite; }
+@keyframes en-low { 50% { opacity: 0.45; } }
+.pc-en em { font: italic 800 0.8em/1 var(--display); color: #c9d6ff; font-style: italic; }
+.pc-en.low em { color: #ff8a70; }
+/* 混乱：整块投手信息摇晃、亮紫红色，名字旁边挂「混乱」 */
+.pc-rattle { display: inline-block; margin-left: 0.5em; padding: 0.2em 0.6em 0.16em; font: 900 1em/1 var(--tc); font-style: normal; letter-spacing: 0.1em; color: #fff;
+  background: linear-gradient(#ff5ad0, #b0209a); border-radius: 0.4em; box-shadow: 0 0 0 0.1em #050a20, 0 0 0.7em #ff5ad0; animation: rattle-tag 0.35s steps(2) infinite; }
+@keyframes rattle-tag { 50% { transform: rotate(-6deg) scale(1.08); } }
+.pitcher-chip.rattled { animation: rattle-chip 0.22s linear infinite; filter: drop-shadow(0 0 0.6em #ff5ad0) drop-shadow(0 0.35em 0.45em rgba(0, 0, 0, 0.55)); }
+.hud-top .pitcher-chip.rattled { filter: none; }
+@keyframes rattle-chip { 0%, 100% { translate: 0 0; } 25% { translate: 0.08em -0.06em; } 50% { translate: -0.07em 0.05em; } 75% { translate: 0.05em 0.07em; } }
+/* 换投手按钮 */
+.pen-btn { position: absolute; right: 1.75em; bottom: 2em; display: none; pointer-events: auto; cursor: pointer; padding: 0.6em 1.2em 0.5em; text-align: center;
+  font: 900 1em/1.1 var(--tc); letter-spacing: 0.1em; color: #fff; border: 0.14em solid #050a20; border-radius: 0.8em;
+  background: linear-gradient(rgba(255, 255, 255, 0.28), transparent 50%), linear-gradient(#2b47a6, #14246a); box-shadow: 0 0 0 0.12em var(--accent), 0 0.25em 0 #050a20; transform-origin: right bottom; }
+.pen-btn.show { display: block; }
+.pen-btn small { display: block; margin-top: 0.3em; font: 700 0.62em/1 var(--tc); letter-spacing: 0.05em; color: var(--accent); }
+.pen-btn:hover { filter: brightness(1.15); }
+body.touch .pen-btn { right: max(1.6em, env(safe-area-inset-right)); bottom: 12em; }
+/* 牛棚菜单 */
+.bullpen { position: absolute; inset: 0; display: none; place-items: center; background: rgba(5, 10, 32, 0.6); pointer-events: auto; z-index: 5; }
+.bullpen.show { display: grid; }
+.bp-box { position: relative; width: min(46em, 94vw); padding: 0.6em 0.8em 0.4em; border: 0.9em solid transparent; border-image: url('/ui/panel.webp') 52 fill / 1em stretch;
+  filter: drop-shadow(0 0.6em 0.8em rgba(0, 0, 0, 0.6)); animation: bp-in 0.25s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes bp-in { from { opacity: 0; scale: 0.85; } }
+.bp-box .seg-head { margin: -2.2em auto 0.2em; height: 3.6em; }
+.bp-cur { display: flex; align-items: center; flex-wrap: wrap; gap: 0.7em; padding-bottom: 0.6em; margin-bottom: 0.7em; border-bottom: 2px solid rgba(255, 217, 46, 0.35); font: 700 0.9em/1 var(--tc); color: #c9d6ff; }
+.bp-cur b { font-size: 1.25em; font-weight: 900; color: #fff; }
+.bp-en { display: inline-flex; align-items: center; gap: 0.5em; }
+.bp-en u { width: 8em; }
+.bp-cur i { padding: 0.25em 0.7em; font-style: normal; font-weight: 900; color: #fff; background: linear-gradient(#ff5ad0, #b0209a); border-radius: 0.4em; }
+.bp-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 0.8em; }
+.bp-card { display: flex; flex-direction: column; align-items: center; gap: 0.4em; padding: 0.9em 0.6em 0.8em; cursor: pointer; color: #fff; font: inherit;
+  background: linear-gradient(rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.02) 48%), #1a2c74; border: 0.14em solid #050a20; box-shadow: inset 0 0 0 0.08em #6f86d6; border-radius: 0.8em; transition: transform 0.12s; }
+.bp-card:hover { transform: translateY(-0.3em); box-shadow: inset 0 0 0 0.12em var(--accent), 0 0 1em rgba(255, 217, 46, 0.6); }
+.bp-card .face { border: 0.12em solid var(--accent); box-shadow: 0 0 0 0.08em #050a20; }
+.bp-card > b { font: 900 1.5em/1.1 var(--tc); letter-spacing: 0.06em; text-shadow: 0 0.07em 0 #050a20; }
+.bp-card > small { font: 700 0.85em/1 var(--tc); color: #c9d6ff; }
+.bp-card > small em { font: italic 900 1.5em/1 var(--display); color: var(--accent); }
+.bp-card dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.2em 0.8em; margin: 0.2em 0; width: 100%; text-align: center; }
+.bp-card dt { font: 700 0.68em/1 var(--tc); color: #c9d6ff; }
+.bp-card dd { margin: 0.25em 0 0; font: italic 900 1.3em/1 var(--display); }
+.bp-pitches { display: flex; flex-wrap: wrap; gap: 0.3em; justify-content: center; }
+.bp-pitches span { display: flex; align-items: center; gap: 0.3em; padding: 0.25em 0.3em 0.25em 0.5em; font: 700 0.75em/1 var(--tc); background: #050a20; box-shadow: inset 0 0 0 0.08em #6f86d6; border-radius: 0.3em; }
+.bp-cancel { display: block; margin: 0.8em auto 0; padding: 0.6em 2em; cursor: pointer; font: 900 0.95em/1 var(--tc); letter-spacing: 0.2em; color: #dfe6ff;
+  background: linear-gradient(rgba(255, 255, 255, 0.18), transparent 50%), #27408f; border: 0.14em solid #050a20; box-shadow: 0 0 0 0.1em #6f86d6; border-radius: 99px; }
+@media (max-width: 700px) {
+  body.touch .pen-btn { right: 0.8em; bottom: 23em; font-size: 0.85em; padding: 0.5em 0.8em 0.4em; }
+  .bp-box { font-size: 0.85em; }
+  .hud-duel .pc-en u { width: 3.4em; }
+  .hud-duel .pc-en { justify-content: flex-end; }
+}
+
+/* 电脑与手机横向：包在外面的两层不占版面，三块信息照原本各自定位 */
+.hud-top, .hud-duel { display: contents; }
+.hud-vs { display: none; }
+/* 手机直式：顶端集成成一块面板——上排记分（队伍、比数、局数、垒包、球数），下排击球员对投手。
+   里面三块不再各自有框、也不各自定位 */
+@media (max-width: 700px) {
+  body[data-mode='live'] .brand, body[data-mode='live'] .tag { display: none; }
+  .hud-top { display: flex; flex-direction: column; position: absolute; left: 0.5em; right: 0.5em; top: max(0.5em, env(safe-area-inset-top));
+    border: 0.8em solid transparent; border-image: url('/ui/panel.webp') 52 fill / 0.95em stretch; filter: drop-shadow(0 0.35em 0.45em rgba(0, 0, 0, 0.55)); }
+  .hud-top .scorebug, .hud-top .batter-card, .hud-top .pitcher-chip, body.touch .hud-top .batter-card {
+    position: static !important; inset: auto !important; transform: none !important; margin: 0 !important; width: auto !important; max-width: none; font-size: 1em;
+    border: 0; border-image: none; filter: none; padding: 0; background: none; }
+  .hud-top .scorebug { justify-content: space-between; align-items: center; gap: 0.6em; }
+  .hud-top .sb-teams { flex: 1; padding: 0; }
+  .hud-top .sb-team em { margin-left: auto; }
+  .hud-top .sb-inn { padding: 0 1.1em; align-self: stretch; }
+  .hud-top .sb-bases { width: 4.2em; height: 3.4em; flex: none; }
+  .hud-top .sb-count { padding: 0 0.2em; }
+  .hud-duel { display: flex; align-items: center; gap: 0.5em; margin-top: 0.45em; padding-top: 0.45em; border-top: 2px solid rgba(255, 217, 46, 0.35); }
+  .hud-duel .batter-card, .hud-duel .pitcher-chip { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 0.5em; }
+  .hud-duel .pitcher-chip { flex-direction: row-reverse; text-align: right; }
+  .hud-duel .face { width: 2.9em; height: 2.9em; flex: none; }
+  .hud-duel .face i { font-size: 0.9em; }
+  .hud-duel .bc-name small { font-size: 0.62em; padding: 0.22em 0.6em 0.18em; margin-bottom: 0.2em; }
+  .hud-duel .bc-name b { font-size: 1.25em; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hud-duel .bc-name span, .hud-duel .bc-stat, .hud-duel .pc-last { display: none; }
+  .hud-duel .pitcher-chip > div:not(.pc-num):not(.pc-last) { min-width: 0; }
+  .hud-duel .pitcher-chip b { font-size: 1.25em; white-space: nowrap; }
+  .hud-duel .pc-num { border-left: 0; border-right: 2px solid rgba(255, 217, 46, 0.35); padding: 0 0.6em 0 0; }
+  .hud-vs { display: block; flex: none; font: italic 900 1.15em/1 var(--display); color: var(--hot); -webkit-text-stroke: 0.28em #050a20; paint-order: stroke fill; text-shadow: 0 0 0.5em var(--accent); }
+  /* 声音钮缩成一颗，放在面板右下角外面 */
+  #mute-toggle { top: 14.6em; right: 0.7em; padding: 0.45em 0.7em; font-size: 0.75em; }
+  #mute-toggle kbd { display: none; }
+  /* 操作说明：一条贴在面板下方，不再压在摇杆上面 */
+  body.touch .hint { top: 15.2em; bottom: auto; left: 0.7em; right: 7.4em; text-align: left; padding: 0.5em 0.9em; font-size: 0.72em; line-height: 1.4; letter-spacing: 0.04em;
+    background: linear-gradient(90deg, rgba(5, 10, 32, 0.85), rgba(5, 10, 32, 0.55)); border-left: 0.3em solid var(--accent); border-radius: 0 0.6em 0.6em 0; text-shadow: none; }
+  .banner { top: 16em; }
+}
+
+/* ── 赛前介绍：同一套金框面板；段落标题是画好的美术字，对战卡用两队的故事插画与 VS 徽记 ── */
+.panel, .venue { background: none; border: 0.85em solid transparent; border-image: url('/ui/panel.webp') 52 fill / 1em stretch; border-radius: 0; backdrop-filter: none;
+  filter: drop-shadow(0 0.4em 0.5em rgba(0, 0, 0, 0.55)); }
+.panel { padding: 0.5em 0.7em 0.4em; }
+.seg-head { display: block; height: 3.4em; width: auto; margin: -1.5em 0 0 -0.9em; filter: drop-shadow(0 0.2em 0.2em rgba(0, 0, 0, 0.5)); }
+.p-kicker { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.8em; font: italic 800 0.85em/1 var(--display); color: #c9d6ff; }
+.p-kicker span { padding-bottom: 0.5em; white-space: nowrap; }
+.p-title h2 { font-weight: 900; text-shadow: 0 0.07em 0 #050a20; }
+.p-title .emblem { font-size: 1.25em; border-color: #fff; }
+.p-sub { color: #c9d6ff; font-weight: 700; border-bottom: 2px solid rgba(255, 217, 46, 0.35); }
+.p-sub b { color: var(--accent); font-weight: 900; }
+/* 球场 */
+.venue { padding: 0.5em 1em 0.6em; }
+.venue .where { color: #c9d6ff; font-weight: 800; }
+.venue h1 { font-weight: 900; text-shadow: 0 0.07em 0 #050a20; }
+.venue .en { font-weight: 800; }
+.venue dt { color: #c9d6ff; font-weight: 700; }
+.venue dd { font: italic 900 1.75em/1 var(--display); text-shadow: 0 0.07em 0 #050a20; }
+/* 对战卡：两队各一格插画，中间 VS 徽记 */
+.mu-head { display: flex; flex-direction: column; align-items: center; gap: 0.3em; margin-bottom: 0.2em; color: #fff; font-weight: 800; text-shadow: 0 0 0.4em #050a20, 0 0.07em 0 #050a20; }
+.mu-head .seg-head { height: 4.2em; margin: 0; }
+.mu-head b { color: var(--accent); }
+.mu-row { position: relative; background: none; border: 0.85em solid transparent; border-image: url('/ui/panel.webp') 52 fill / 1em stretch; border-radius: 0; backdrop-filter: none; overflow: visible;
+  filter: drop-shadow(0 0.5em 0.6em rgba(0, 0, 0, 0.6)); }
+.mu-team { position: relative; min-width: 20em; padding: 1.5em 1.4em; overflow: hidden; border-radius: 0.3em;
+  background: linear-gradient(90deg, rgba(5, 10, 32, 0.88) 30%, color-mix(in srgb, var(--c1) 40%, transparent) 75%, transparent), var(--art) 50% 28% / cover no-repeat; }
+.mu-team.home { background: linear-gradient(270deg, rgba(5, 10, 32, 0.88) 30%, color-mix(in srgb, var(--c1) 40%, transparent) 75%, transparent), var(--art) 50% 28% / cover no-repeat; }
+.mu-team .emblem.big { font-size: 2.2em; border-color: #fff; box-shadow: 0 0 0 0.08em #050a20, 0 0.2em 0.4em rgba(0, 0, 0, 0.5); }
+.mu-text small { color: var(--accent); font: italic 800 0.85em/1 var(--display); }
+.mu-text b { font-weight: 900; font-size: 2.1em; text-shadow: 0 0.07em 0 #050a20; }
+.mu-text span { color: #fff; font-weight: 700; }
+.mu-text em { color: var(--accent); font-weight: 900; }
+.mu-vs { position: relative; z-index: 1; width: 6.5em; padding: 0; margin: 0 -0.6em; background: none; transform: none; overflow: visible; }
+.mu-vs img { position: absolute; left: 50%; top: 50%; width: 7.6em; height: auto; translate: -50% -50%; filter: drop-shadow(0 0 0.7em rgba(255, 190, 40, 0.8)); animation: vs-beat 1s ease-in-out infinite; }
+/* 打序表 */
+.rows li { border-bottom: 1px solid rgba(255, 217, 46, 0.14); padding: 0.26em 0.3em; border-radius: 0.3em; }
+.rows li:nth-child(even):not(.head) { background: rgba(255, 255, 255, 0.06); }
+.rows li.head { color: var(--accent); font-weight: 800; }
+.rows .ord { display: grid; place-items: center; width: 1.25em; height: 1.25em; border-radius: 50%; font: italic 900 1.15em/1 var(--display); color: var(--navy);
+  background: linear-gradient(#fff6b0, var(--accent) 55%, #ff9a1e); box-shadow: 0 0 0 0.09em #050a20; }
+.rows .pos { font-weight: 800; color: #fff; background: #050a20; box-shadow: inset 0 0 0 0.08em #6f86d6; }
+.rows .nm b { font-weight: 900; }
+.rows .nm em, .rows li .st { color: #fff; }
+.rows .nm em { color: #c9d6ff; }
+.rows .st { font: italic 800 1.2em/1 var(--display); }
+.rows .ovr { font: italic 900 1.25em/1 var(--display); color: var(--accent); }
+.rows .ovr u, .bar u { height: 0.42em; background: #050a20; box-shadow: inset 0 0 0 0.06em #5d72bd; }
+.rows .ovr s, .bar s { background: linear-gradient(rgba(255, 255, 255, 0.6), transparent 55%), linear-gradient(90deg, #ff9a1e, var(--accent)); border-radius: 1em; }
+#intro .face { border: 0.12em solid var(--accent); box-shadow: 0 0 0 0.08em #050a20; }
+/* 防守：场上每个人头上的名牌 */
+.ptag > div { background: linear-gradient(rgba(255, 255, 255, 0.18), transparent 50%), #14246a; border: 0.12em solid #050a20; box-shadow: 0 0 0 0.1em var(--accent), 0 0.2em 0.3em rgba(0, 0, 0, 0.5); border-radius: 0.5em; }
+.ptag > div::after { width: 0.14em; background: var(--accent); }
+.ptag span { font-weight: 900; color: var(--navy); background: linear-gradient(#fff6b0, var(--accent)); }
+.ptag b { font-weight: 900; }
+.ptag em { color: #c9d6ff; font-weight: 800; }
+/* 首发投手 */
+.pt-top h2 { font-weight: 900; font-size: 2.4em; text-shadow: 0 0.07em 0 #050a20; }
+.pt-meta { color: #c9d6ff; font-weight: 700; }
+.pt-ovr { color: #c9d6ff; font-weight: 800; }
+.pt-ovr b { font: italic 900 2.4em/1 var(--display); text-shadow: 0 0.07em 0 #050a20; }
+.pt-stats, .pt-foot { border-color: rgba(255, 217, 46, 0.35); border-width: 2px; }
+.pt-stats dt, .pt-speed { color: #c9d6ff; font-weight: 700; }
+.pt-stats dd { font: italic 900 1.6em/1 var(--display); }
+.bar { font-weight: 700; }
+.bar em { font: italic 900 1.3em/1 var(--display); color: var(--accent); }
+.pt-speed b { font: italic 900 2.8em/1 var(--display); color: var(--accent); text-shadow: 0 0.07em 0 #050a20; }
+.pt-pitches span { font-weight: 700; background: #050a20; box-shadow: inset 0 0 0 0.08em #6f86d6; }
+/* 拿手程度的字母：红、橘、金、蓝（不用绿色） */
+.g { font-weight: 900; border-radius: 0.3em; color: #050a20; box-shadow: inset 0 0.12em 0 rgba(255, 255, 255, 0.55), 0 0 0 0.07em #050a20; }
+.g-A { background: #ff5a3a; color: #fff; } .g-B { background: #ff9a1e; } .g-C { background: var(--accent); } .g-D { background: #49c4ff; } .g-E { background: #9aa4c8; }
+/* 略过 */
+.intro-bar button { border: 0.14em solid #050a20; border-radius: 99px; color: #fff; font-weight: 900; background: linear-gradient(rgba(255, 255, 255, 0.4), transparent 50%), linear-gradient(#ff6a3a, var(--hot));
+  box-shadow: 0 0 0 0.12em var(--accent), 0 0.22em 0 #050a20; padding: 0.6em 1.3em; }
+.ib-skip:hover { background: linear-gradient(rgba(255, 255, 255, 0.55), transparent 50%), linear-gradient(#ff7a4a, #f04436); }
+@media (max-width: 700px) {
+  .mu-team { min-width: 0; padding: 1em 1.1em; }
+  .mu-vs { width: auto; height: 1.2em; }
+  .mu-vs img { width: 6.5em; }
+  .seg-head { height: 2.8em; }
+}
+
+/* ── 标题画面：整张主视觉插画，缓慢推近；右下角是标题字 ── */
+#title-screen { position: fixed; inset: 0; z-index: 70; overflow: hidden; cursor: pointer; background: #0b1a3a; font-family: 'Noto Sans SC', var(--tc);
+  transition: opacity 0.45s, transform 0.45s; }
+#title-screen.out { opacity: 0; transform: scale(1.12); pointer-events: none; }
+#title-screen i { position: absolute; inset: 0; pointer-events: none; }
+.tt-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 28% 50%; transform-origin: 30% 60%; animation: tt-push 16s ease-in-out infinite alternate; }
+@keyframes tt-push { from { transform: scale(1.02); } to { transform: scale(1.13) translate(-1.5%, -1%); } }
+/* 太阳的光晕忽明忽暗 */
+.tt-flare { background: radial-gradient(38% 46% at 92% 4%, rgba(255, 250, 220, 0.75), rgba(255, 240, 180, 0.18) 55%, transparent 72%); mix-blend-mode: screen; animation: tt-flare 3.6s ease-in-out infinite; }
+@keyframes tt-flare { 50% { opacity: 0.55; } }
+/* 飘在空中的尘土 */
+.tt-dust { background:
+    radial-gradient(circle, rgba(255, 236, 200, 0.9) 0 1.5px, transparent 2px) 0 0 / 190px 170px,
+    radial-gradient(circle, rgba(255, 220, 170, 0.7) 0 2.2px, transparent 3px) 60px 40px / 260px 230px,
+    radial-gradient(circle, rgba(255, 255, 255, 0.8) 0 1px, transparent 1.6px) 30px 90px / 130px 150px;
+  animation: tt-dust 9s linear infinite; opacity: 0.8; }
+@keyframes tt-dust { to { background-position: 190px -170px, 320px -190px, 160px -60px; } }
+.tt-shade { background: linear-gradient(transparent 50%, rgba(6, 14, 40, 0.5)), radial-gradient(80% 70% at 78% 78%, rgba(6, 14, 40, 0.42), transparent 70%); }
+.tt-logo { position: absolute; right: 3vw; bottom: 15vh; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 0.6vh; }
+/* 标志（scripts/gen_logo.mjs 画的）：从画面外砸进来，之后轻轻浮动 */
+.tt-mark { width: clamp(300px, 50vw, 820px); height: auto; filter: drop-shadow(0 14px 22px rgba(4, 10, 36, 0.6));
+  animation: tt-slam 0.7s cubic-bezier(0.2, 1.5, 0.4, 1) both, tt-float 3.2s 0.7s ease-in-out infinite alternate; }
+@keyframes tt-slam { 0% { opacity: 0; transform: scale(2.6) rotate(-10deg); } 60% { opacity: 1; transform: scale(0.94) rotate(1deg); } 100% { transform: scale(1); } }
+@keyframes tt-float { to { transform: translateY(-1.2vh) rotate(-0.6deg); } }
+.tt-year { padding: 0.35em 1.1em; font: 900 clamp(0.85rem, 2.3vh, 1.3rem)/1 'Noto Sans SC', var(--tc); letter-spacing: 0.3em; color: #12235a; background: #ffd92e; border: 3px solid #12235a; border-radius: 99px;
+  box-shadow: 4px 4px 0 #12235a; animation: tt-pop 0.5s 0.8s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes tt-pop { from { opacity: 0; scale: 0.3; } }
+.tt-start { position: absolute; left: 50%; bottom: 5.5vh; z-index: 2; translate: -50% 0; white-space: nowrap; padding: 0.6em 2.4em 0.5em; cursor: pointer; font: 900 clamp(1rem, 3vh, 1.6rem)/1 'Noto Sans SC', var(--tc); letter-spacing: 0.3em;
+  color: #12235a; background: #fff; border: 4px solid #12235a; border-radius: 99px; box-shadow: 0 6px 0 #12235a; animation: tt-blink 1.1s ease-in-out infinite; }
+.tt-start small { display: block; margin-top: 0.35em; font: italic 800 0.5em/1 'Barlow Condensed', var(--display); letter-spacing: 0.4em; color: #e8372c; }
+@keyframes tt-blink { 50% { scale: 1.07; box-shadow: 0 6px 0 #12235a, 0 0 0 10px rgba(255, 255, 255, 0.35); } }
+@media (max-width: 700px) {
+  .tt-art { object-position: 24% 50%; }
+  .tt-logo { right: 0; left: 0; bottom: 17vh; }
+  .tt-mark { width: 96vw; }
+}
+
+/* ── 对决画面：两队的故事插画满版对撞，中间一道斜切的光；接口和标题画面同一套（深蓝、金、红的亮面质感）── */
+#team-select, #team-select * { touch-action: manipulation; }
+#team-select { position: fixed; inset: 0; z-index: 60; overflow: hidden; color: #fff; font-family: 'Noto Sans SC', var(--tc); background: #0b1535;
+  --you1: #1f5a4c; --you2: #e9dfc6; --foe1: #3b4a63; --foe2: #d9634a; --cut: 8vw; --navy: #12235a; --deep: #0b1535; --gold: #ffd92e; --hot: #e8372c;
+  transition: opacity 0.35s, transform 0.35s; animation: vs-open 0.4s both; }
+@keyframes vs-open { from { opacity: 0; } }
+#team-select.out { opacity: 0; transform: scale(1.06); pointer-events: none; }
+/* 两格插画：满版、不留边，中间斜切 */
+.vs-panel { position: absolute; inset: 0; cursor: pointer; }
+.vs-panel.you { clip-path: polygon(0 0, calc(50% + var(--cut)) 0, calc(50% - var(--cut)) 100%, 0 100%); }
+.vs-panel.foe { clip-path: polygon(calc(50% + var(--cut)) 0, 100% 0, 100% 100%, calc(50% - var(--cut)) 100%); }
+.vs-art { position: absolute; inset: 0; overflow: hidden; background: var(--you1); }
+.vs-panel.foe .vs-art { background: var(--foe1); }
+.vs-art img { position: absolute; top: 0; height: 100%; width: calc(50% + var(--cut)); object-fit: cover; object-position: 50% 30%; }
+.vs-panel.you img { left: 0; }
+.vs-panel.foe img { right: 0; scale: -1 1; } /* 插画都画成朝右，对手那格左右翻转，两边才会面对面 */
+.vs-art img.in { animation: vs-art-in 0.5s cubic-bezier(0.2, 1.2, 0.4, 1) both, vs-drift 12s 0.5s ease-in-out infinite alternate; }
+@keyframes vs-art-in { from { transform: scale(1.5); filter: brightness(3) saturate(0); } }
+@keyframes vs-drift { from { transform: scale(1); } to { transform: scale(1.09) translateY(-1.5%); } }
+/* 上下用队色压暗（不是黑的），字才读得到，也和插画的色调接得起来 */
+.vs-art::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(color-mix(in srgb, var(--you1) 45%, rgba(8, 14, 40, 0.78)), transparent 24%, transparent 60%, rgba(8, 14, 40, 0.88) 96%); }
+.vs-panel.foe .vs-art::after { background: linear-gradient(color-mix(in srgb, var(--foe1) 45%, rgba(8, 14, 40, 0.78)), transparent 24%, transparent 60%, rgba(8, 14, 40, 0.88) 96%); }
+/* 斜切的那道光：白芯、金边、外面一圈光晕 */
+#team-select::before { content: ''; position: absolute; z-index: 2; top: -5%; bottom: -5%; left: 50%; width: 10px; margin-left: -5px; pointer-events: none;
+  transform: rotate(atan2(calc(var(--cut) * 2), 100vh)); background: linear-gradient(90deg, var(--gold), #fff 35%, #fff 65%, var(--gold));
+  box-shadow: 0 0 0 3px var(--navy), 0 0 26px 6px rgba(255, 217, 46, 0.85), 0 0 90px 22px rgba(255, 160, 40, 0.45); animation: vs-flick 1.6s ease-in-out infinite; }
+@keyframes vs-flick { 0%, 100% { opacity: 0.92; } 46% { opacity: 1; } 50% { opacity: 0.6; } 54% { opacity: 1; } }
+
+.vs-top { position: absolute; left: 0; right: 0; top: 0; z-index: 7; pointer-events: none; }
+.vs-title { position: absolute; left: 50%; top: 0.4vh; transform: translateX(-50%); width: clamp(220px, 34vh, 400px); aspect-ratio: 1000 / 304; display: grid; place-items: center; padding-top: 1.1%;
+  font-weight: 900; font-size: clamp(0.9rem, 2.5vh, 1.4rem); line-height: 1; letter-spacing: 0.3em; text-indent: 0.3em; color: var(--navy); text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  background: url('/ui/ribbon.webp') center / 100% 100% no-repeat; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5)); }
+
+/* 两边的球队名牌：队徽压在一条深蓝色的斜牌上，里面是身分、队名、战绩与整体评价；台词贴在名牌下面 */
+.vs-side { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 3; pointer-events: none; }
+.vs-side.you { left: 0; } .vs-side.foe { right: 0; }
+.vs-plate { position: absolute; top: 3.2vh; display: flex; align-items: center; gap: 1.4vh; max-width: min(33vw, 70vh); padding: 1.2vh 4vh 1.2vh 1.6vh; animation: vs-fade 0.4s 0.1s both;
+  background: linear-gradient(90deg, rgba(5, 10, 32, 0.92), rgba(5, 10, 32, 0.82) 62%, rgba(5, 10, 32, 0)); border-bottom: 0.5vh solid var(--gold); box-shadow: inset 0.8vh 0 0 var(--you1); }
+.vs-side.you .vs-plate { left: 0; }
+.vs-side.foe .vs-plate { right: 0; flex-direction: row-reverse; text-align: right; padding: 1.2vh 1.6vh 1.2vh 4vh;
+  background: linear-gradient(270deg, rgba(5, 10, 32, 0.92), rgba(5, 10, 32, 0.82) 62%, rgba(5, 10, 32, 0)); box-shadow: inset -0.8vh 0 0 var(--foe1); }
+@keyframes vs-fade { from { opacity: 0; transform: translateY(-16px); } }
+.vs-plate .emblem.big { font-size: clamp(1.5rem, 5.2vh, 3rem); border-color: #fff; box-shadow: 0 0 0 0.08em var(--navy), 0 0.15em 0.3em rgba(0, 0, 0, 0.5); margin-left: 0.8vh; }
+.vs-side.foe .vs-plate .emblem.big { margin: 0 0.8vh 0 0; }
+.vs-plate-txt { display: flex; flex-direction: column; gap: 0.5vh; min-width: 0; }
+.vs-role { font-weight: 900; font-size: clamp(0.62rem, 1.6vh, 0.85rem); letter-spacing: 0.2em; color: #c9d6ff; }
+.vs-side.on .vs-role { color: var(--gold); }
+.vs-plate h2 { margin: 0; font-weight: 900; font-size: clamp(1.5rem, 5.4vh, 3.3rem); line-height: 1.05; letter-spacing: 0.03em; color: #fff; white-space: nowrap; text-shadow: 0 0.07em 0 #050a20; }
+.vs-meta { display: flex; align-items: baseline; gap: 1.6vh; font-weight: 700; font-size: clamp(0.72rem, 1.9vh, 1rem); color: #fff; }
+.vs-side.foe .vs-meta { flex-direction: row-reverse; }
+.vs-meta i { font: italic 800 1em/1 'Barlow Condensed', var(--display); letter-spacing: 0.1em; color: #c9d6ff; }
+.vs-meta i b { margin-left: 0.3em; font-size: 1.7em; color: var(--gold); }
+.vs-line { position: absolute; top: calc(3.2vh + clamp(5.4rem, 16.5vh, 9.6rem)); margin: 0; max-width: min(30vw, 62vh); padding: 0.6vh 2.4vh; font-weight: 900; font-size: clamp(0.78rem, 2.1vh, 1.15rem); line-height: 1.3; color: var(--gold);
+  background: linear-gradient(90deg, rgba(5, 10, 32, 0.78), rgba(5, 10, 32, 0)); animation: vs-fade 0.4s 0.25s both; }
+.vs-side.you .vs-line { left: 0; }
+.vs-side.foe .vs-line { right: 0; text-align: right; background: linear-gradient(270deg, rgba(5, 10, 32, 0.78), rgba(5, 10, 32, 0)); }
+
+/* 中间的 VS：画好的徽记（public/ui/vs.webp） */
+.vs-mark { position: absolute; left: 50%; top: 35%; z-index: 5; transform: translate(-50%, -50%); pointer-events: none; width: clamp(9rem, 34vh, 20rem); }
+.vs-mark img { display: block; width: 100%; height: auto; filter: drop-shadow(0 0 30px rgba(255, 190, 40, 0.8)) drop-shadow(0 10px 14px rgba(0, 0, 0, 0.5)); animation: vs-beat 1s ease-in-out infinite; }
+@keyframes vs-beat { 50% { transform: scale(1.05) rotate(-1.5deg); } }
+.vs-mark.hit { animation: vs-slam 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both; }
+@keyframes vs-slam { 0% { transform: translate(-50%, -50%) scale(3.4) rotate(-14deg); opacity: 0; } 55% { transform: translate(-50%, -50%) scale(0.9) rotate(3deg); opacity: 1; }
+  70% { transform: translate(-51.5%, -49%) scale(1.05); } 85% { transform: translate(-48.5%, -51%) scale(0.98); } 100% { transform: translate(-50%, -50%) scale(1); } }
+
+/* 下方的操作区：战力面板叠在选队列上面 */
+.vs-dock { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 4.2vh; padding: 0 1.6vw 1.8vh;
+  background: linear-gradient(transparent, rgba(6, 12, 36, 0.82) 38%); }
+/* 战力对决：画好的金框面板（public/ui/board.webp）当底，上面是四条拉锯条 */
+.vs-cmp { position: relative; width: min(44vw, 50vh, 520px); aspect-ratio: 1000 / 409; background: url('/ui/board.webp') center / 100% 100% no-repeat; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.55)); }
+.vs-cmp-title { position: absolute; left: 50%; top: 11.5%; transform: translate(-50%, -50%); font-weight: 900; font-size: clamp(0.7rem, 1.9vh, 1rem); letter-spacing: 0.3em; text-indent: 0.3em; color: var(--navy); white-space: nowrap; }
+.vs-rows { position: absolute; inset: 27% 6.5% 10% 6.5%; display: flex; flex-direction: column; justify-content: space-evenly; }
+.vs-row { display: grid; grid-template-columns: 2.6em 1fr 2.6em; align-items: center; gap: 0.8em; font-size: clamp(0.7rem, 1.7vh, 0.95rem); }
+.vs-row em { font: italic 900 1.35em/1 'Barlow Condensed', var(--display); color: #a9b8ee; white-space: nowrap; }
+.vs-row em.l { text-align: right; }
+.vs-row em small { margin: 0 0.35em; font: italic 800 1.25em/1 'Barlow Condensed', var(--display); }
+.vs-row em.win { color: #fff; text-shadow: 0 0 10px var(--gold), 0 2px 0 var(--navy); }
+.vs-row em.win small { color: var(--gold); }
+.vs-tug { position: relative; height: 1.7em; display: flex; border-radius: 99px; border: 2px solid #050a20; box-shadow: 0 0 0 2px rgba(255, 217, 46, 0.55), inset 0 2px 5px rgba(0, 0, 0, 0.6); overflow: visible; background: #050a20; }
+.vs-tug i { display: block; height: 100%; transition: width 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
+.vs-tug i.l { border-radius: 99px 0 0 99px; background: linear-gradient(rgba(255, 255, 255, 0.42), transparent 42%, rgba(0, 0, 0, 0.25)), linear-gradient(90deg, color-mix(in srgb, var(--you1) 75%, #000), var(--you1) 60%, color-mix(in srgb, var(--you1) 80%, #fff 20%)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+.vs-tug i.r { flex: 1; border-radius: 0 99px 99px 0; background: linear-gradient(rgba(255, 255, 255, 0.42), transparent 42%, rgba(0, 0, 0, 0.25)), linear-gradient(90deg, color-mix(in srgb, var(--foe1) 80%, #fff 20%), var(--foe1) 40%, color-mix(in srgb, var(--foe1) 75%, #000)); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+/* 两队相撞的地方：一颗发亮的火花 */
+.vs-tug u { position: absolute; top: 50%; width: 1.9em; height: 1.9em; margin: -0.95em 0 0 -0.95em; transition: left 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); pointer-events: none;
+  background: radial-gradient(#fff 16%, var(--gold) 34%, rgba(255, 140, 30, 0.9) 50%, transparent 70%);
+  clip-path: polygon(50% 0, 60% 32%, 92% 18%, 70% 44%, 100% 54%, 68% 60%, 84% 92%, 54% 70%, 44% 100%, 38% 68%, 6% 84%, 28% 56%, 0 44%, 32% 40%, 14% 10%, 44% 30%); animation: vs-spark 0.4s steps(2) infinite; }
+@keyframes vs-spark { 50% { transform: rotate(24deg) scale(1.15); } }
+.vs-tug b { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-weight: 900; font-size: 0.82em; letter-spacing: 0.2em; text-indent: 0.2em; color: #fff; white-space: nowrap;
+  -webkit-text-stroke: 4px var(--navy); paint-order: stroke fill; pointer-events: none; }
+
+/* 选队列 */
+.vs-foot { display: flex; align-items: flex-end; justify-content: center; gap: 2vw; width: 100%; }
+.vs-tabs { display: flex; flex-direction: column; gap: 0.8vh; flex: none; padding-bottom: 0.6vh; }
+.vs-tabs button { padding: 0.7em 1.2em 0.62em; cursor: pointer; font: 900 clamp(0.78rem, 1.9vh, 0.95rem)/1 'Noto Sans SC', var(--tc); letter-spacing: 0.08em; color: #dfe6ff; border-radius: 12px;
+  background: linear-gradient(rgba(255, 255, 255, 0.22), transparent 50%), linear-gradient(#27408f, #101c4e); border: 2px solid #050a20; box-shadow: 0 0 0 2px #6f86d6, 0 4px 0 #050a20; }
+.vs-tabs button.on { color: var(--navy); background: linear-gradient(rgba(255, 255, 255, 0.75), transparent 50%), linear-gradient(#ffe763, #ffab1a); box-shadow: 0 0 0 2px #fff3a8, 0 4px 0 #050a20, 0 0 18px rgba(255, 217, 46, 0.85); transform: translateY(-2px); }
+/* 卡片固定大小（依屏幕高度与宽度取小的），不会撑高去压到上面的战力表 */
+.vs-chips { display: grid; grid-template-columns: repeat(8, min(7.4vw, 11.2vh)); gap: min(0.7vw, 1vh); align-items: end; }
+/* 球队卡：画好的金框（public/ui/card.webp）盖在队色底上，窗口里是队徽与战绩，名牌上是队名 */
+.vs-chip { position: relative; aspect-ratio: 0.688; padding: 0; cursor: pointer; color: #fff; font: inherit; border: 0; background: none; transition: transform 0.14s cubic-bezier(0.2, 1.6, 0.4, 1); filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.55)); }
+.vs-chip::after { content: ''; position: absolute; inset: 0; background: url('/ui/card.webp') center / 100% 100% no-repeat; pointer-events: none; }
+.vs-chip-win { position: absolute; inset: 8% 7% 28% 7%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4%; border-radius: 8%;
+  background: radial-gradient(90% 70% at 50% 30%, color-mix(in srgb, var(--c1) 55%, #fff 45%), var(--c1) 60%, color-mix(in srgb, var(--c1) 60%, #000) 100%); }
+.vs-chip-win .emblem { font-size: clamp(1rem, 3.3vh, 1.75rem); border-color: #fff; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5); }
+.vs-chip-win em { font: italic 800 clamp(0.7rem, 1.8vh, 0.95rem)/1 'Barlow Condensed', var(--display); letter-spacing: 0.06em; color: #fff; -webkit-text-stroke: 3px rgba(5, 10, 32, 0.85); paint-order: stroke fill; }
+.vs-chip > b { position: absolute; left: 0; right: 0; bottom: 13.5%; z-index: 1; text-align: center; font-weight: 900; font-size: clamp(0.78rem, 2.1vh, 1.05rem); letter-spacing: 0.1em; text-indent: 0.1em; color: #fff; text-shadow: 0 2px 0 #050a20; }
+.vs-chip:hover { transform: translateY(-8%) rotate(-2deg); }
+.vs-chip.you, .vs-chip.foe { transform: translateY(-12%) scale(1.08); z-index: 1; }
+.vs-chip.you { filter: drop-shadow(0 0 10px var(--gold)) drop-shadow(0 0 22px rgba(255, 217, 46, 0.8)); }
+.vs-chip.foe { filter: drop-shadow(0 0 10px #ff6a4a) drop-shadow(0 0 22px rgba(255, 90, 60, 0.8)); }
+.vs-chip.you::before, .vs-chip.foe::before { position: absolute; z-index: 2; top: -9%; left: 50%; transform: translateX(-50%); padding: 0.28em 0.9em 0.22em; font: 900 clamp(0.6rem, 1.5vh, 0.75rem)/1.1 'Noto Sans SC', var(--tc); letter-spacing: 0.1em;
+  border: 2px solid #050a20; border-radius: 99px; white-space: nowrap; box-shadow: 0 2px 0 #050a20; }
+.vs-chip.you::before { content: '你的球队'; color: var(--navy); background: linear-gradient(#fff3a8, var(--gold)); }
+.vs-chip.foe::before { content: '对手'; color: #fff; background: linear-gradient(#ff7a55, var(--hot)); }
+/* 开赛：画好的按钮（public/ui/playball.webp） */
+.vs-go { position: relative; flex: none; width: min(21vw, 38vh, 320px); padding: 0; border: 0; background: none; cursor: pointer; animation: vs-go 0.9s ease-in-out infinite; filter: drop-shadow(0 0 16px rgba(255, 110, 50, 0.8)) drop-shadow(0 8px 10px rgba(0, 0, 0, 0.5)); }
+.vs-go img { display: block; width: 100%; height: auto; }
+.vs-go small { position: absolute; left: 50%; bottom: -0.2em; transform: translateX(-50%); padding: 0.22em 1.2em 0.18em; font: 900 clamp(0.7rem, 1.8vh, 0.9rem)/1.1 'Noto Sans SC', var(--tc); letter-spacing: 0.5em; text-indent: 0.5em;
+  color: var(--navy); background: linear-gradient(#fff3a8, var(--gold)); border: 2px solid #050a20; border-radius: 99px; box-shadow: 0 2px 0 #050a20; }
+.vs-go:hover { animation-play-state: paused; scale: 1.08; }
+@keyframes vs-go { 50% { scale: 1.05; rotate: -1.5deg; } }
+
+/* 手机直式：上下对决 */
+@media (max-width: 700px) {
+  #team-select::before { top: 39%; bottom: auto; left: -10%; width: 120%; height: 8px; margin: 0; transform: rotate(-9.5deg); }
+  .vs-panel.you { clip-path: polygon(0 0, 100% 0, 100% 35.5%, 0 43.5%); }
+  .vs-panel.foe { clip-path: polygon(0 43.5%, 100% 35.5%, 100% 100%, 0 100%); }
+  .vs-art img { width: 100%; }
+  .vs-panel.you img { top: 0; height: 45%; }
+  .vs-panel.foe img { top: 34%; height: 52%; }
+  .vs-art::after { background: linear-gradient(color-mix(in srgb, var(--you1) 55%, rgba(8, 14, 40, 0.9)), transparent 16%); }
+  .vs-panel.foe .vs-art::after { background: linear-gradient(transparent 58%, rgba(8, 14, 40, 0.9) 76%); }
+  .vs-title { display: none; }
+  .vs-side { width: 100%; height: auto; top: 0; bottom: 0; }
+  .vs-plate { top: 2vh; max-width: 82vw; padding: 0.8vh 3vh 0.8vh 1vh; gap: 1vh; }
+  .vs-side.foe .vs-plate { top: auto; bottom: 23.5vh; padding: 0.8vh 1vh 0.8vh 3vh; }
+  .vs-plate .emblem.big { font-size: 1.5rem; }
+  .vs-plate h2 { font-size: 1.5rem; }
+  .vs-line { display: none; }
+  .vs-mark { top: 39.5%; width: 10.5rem; }
+  .vs-cmp { display: none; }
+  .vs-dock { padding: 1.2vh 3vw 1.6vh; background: linear-gradient(rgba(11, 21, 53, 0.92), var(--deep)); border-top: 3px solid var(--gold); }
+  .vs-foot { flex-wrap: wrap; align-items: center; gap: 1.2vh 2vw; }
+  .vs-tabs { flex-direction: row; flex: 1; gap: 2vw; padding: 0; }
+  .vs-tabs button { flex: 1; white-space: nowrap; padding: 0.7em 0.3em; font-size: 0.8rem; }
+  .vs-go { order: 2; width: 40vw; }
+  .vs-go small { display: none; }
+  .vs-chips { order: 3; flex: none; width: 100%; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 1vw; padding-top: 1.4vh; }
+  .vs-dock { gap: 0; }
+  .vs-chip-win em { display: none; }
+  .vs-chip-win .emblem { font-size: 0.82rem; }
+  .vs-chip > b { font-size: 0.56rem; letter-spacing: 0; text-indent: 0; }
+  .vs-chip.you::before, .vs-chip.foe::before { font-size: 0.5rem; padding: 0.2em 0.5em; }
+  .vs-chip.you::before { content: '你'; }
+}
+
+/* ══ 暂停 ══ */
+#pause-toggle { position: absolute; right: 9em; top: 1.2em; pointer-events: auto; cursor: pointer; display: none; align-items: center; gap: 0.5em;
+  padding: 0.45em 0.7em; font: 700 0.85em/1 var(--tc); letter-spacing: 0.08em; color: #fff; border-radius: 99px;
+  background: linear-gradient(rgba(255, 255, 255, 0.18), transparent 50%), #1a2c74; border: 2px solid #050a20; box-shadow: 0 0 0 2px #6f86d6; }
+#pause-toggle kbd { font: 700 0.9em/1 var(--display); padding: 0.2em 0.4em; border-radius: 0.2em; background: var(--accent); color: #10161b; }
+#pause-toggle:hover { box-shadow: 0 0 0 2px var(--accent); }
+body[data-mode='live'] #pause-toggle { display: flex; }
+body:has(.final.show) #pause-toggle { display: none; }
+/* 比赛中多了暂停钮，赛事标题再往左让 */
+body[data-mode='live'] .tag { right: 16.6em; }
+#pause-screen { position: fixed; inset: 0; z-index: 58; display: grid; place-items: center; pointer-events: auto;
+  background: radial-gradient(circle at 50% 40%, rgba(18, 35, 90, 0.72), rgba(5, 10, 32, 0.9)); backdrop-filter: blur(3px); }
+#pause-screen[hidden] { display: none; }
+.ps-box { display: flex; flex-direction: column; align-items: center; gap: 1.1em; min-width: 22em; padding: 1.4em 2.2em 1.2em; text-align: center; color: #fff;
+  border: 1em solid transparent; border-image: url('/ui/panel.webp') 52 fill / 0.95em stretch; animation: bp-in 0.25s both; }
+.ps-box h2 { margin: 0; font: 900 3em/1 'Noto Sans SC', var(--tc); letter-spacing: 0.18em; text-indent: 0.18em; color: var(--accent);
+  -webkit-text-stroke: 0.12em #050a20; paint-order: stroke fill; }
+.ps-score { margin: 0; display: flex; align-items: center; gap: 0.7em; font: 700 1em/1 var(--tc); }
+.ps-score b { font: italic 900 2em/1 var(--display); color: var(--accent); }
+.ps-score i { font-style: normal; font-size: 0.8em; padding: 0.35em 0.8em; border-radius: 99px; background: #050a20; box-shadow: inset 0 0 0 0.1em #6f86d6; color: #c9d6ff; }
+.ps-btns { display: flex; gap: 1em; }
+.ps-btns button { padding: 0.7em 1.8em 0.62em; cursor: pointer; white-space: nowrap; font: 900 1.05em/1 'Noto Sans SC', var(--tc); letter-spacing: 0.2em; text-indent: 0.2em; color: #fff;
+  border: 0.16em solid #050a20; border-radius: 99px; box-shadow: 0 0 0 0.12em #fff3, 0 0.3em 0 #050a20; }
+#ps-resume { background: linear-gradient(rgba(255, 255, 255, 0.3), transparent 50%), linear-gradient(#ff5a3c, #c41a12); }
+#ps-reselect { background: linear-gradient(rgba(255, 255, 255, 0.28), transparent 50%), linear-gradient(#2b47a6, #14246a); }
+.ps-btns button:hover { filter: brightness(1.12); translate: 0 -2px; }
+.ps-tip { font: 700 0.75em/1 var(--tc); color: #c9d6ff; letter-spacing: 0.12em; }
+body.touch .ps-tip, body.touch #pause-toggle kbd { display: none; }
+@media (max-width: 700px) {
+  /* 手机直式：暂停钮放在声音钮正下方 */
+  #pause-toggle { top: 17.6em; right: 0.7em; padding: 0.45em 0.7em; font-size: 0.75em; }
+  .ps-box { min-width: 0; width: 86vw; padding: 1em 0.6em; }
+  .ps-box h2 { font-size: 2.4em; }
+  .ps-btns { width: 100%; gap: 0.6em; }
+  .ps-btns button { flex: 1; padding: 0.8em 0.3em; }
+}

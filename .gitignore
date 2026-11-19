@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.DS_Store
+.claude/
+.wrangler/
+.venv-tts/
+
+# 产图时留下的原始大图（可用 scripts 里的脚本重新产生）
+art/
